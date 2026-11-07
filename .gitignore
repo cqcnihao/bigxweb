@@ -1,6 +1,7 @@
 # Maven
 target/
 *.class
+*.versionsBackup
 
 # IDE
 .idea/

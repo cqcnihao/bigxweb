@@ -123,7 +123,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(RuntimeException.class)
     public Result<Void> handleRuntimeException(RuntimeException e) {
         log.error("运行时异常: {}", e.getMessage(), e);
-        return Result.error(ResultCode.INTERNAL_SERVER_ERROR.getCode(), e.getMessage());
+        // 异常明细可能泄露 SQL / 内部路径等信息，仅记录日志，不回传客户端
+        return Result.error(ResultCode.INTERNAL_SERVER_ERROR.getCode(), "服务器内部错误");
     }
 
     /**

@@ -10,8 +10,8 @@ spring:
     type: com.alibaba.druid.pool.DruidDataSource
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/${DB_NAME:big_business}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
-    username: ${DB_USER:root}
-    password: ${DB_PASSWORD:}
+    username: ${DB_USER:cqcnihao}
+    password: ${DB_PASSWORD:cqcnihao}
   data:
     redis:
       host: ${REDIS_HOST:127.0.0.1}
@@ -38,10 +38,12 @@ mybatis-plus:
 
 sa-token:
   token-name: Authorization
-  timeout: 86400
+  # 与 big-auth 保持一致：30 天有效，避免下游 token 提前失效
+  timeout: 2592000
   active-timeout: -1
   is-concurrent: true
-  is-share: true
+  # 与 big-auth 一致：每次登录新建 token，便于单端踢下线
+  is-share: false
   token-style: uuid
   is-log: false
 

@@ -2,8 +2,6 @@ package com.cqcnihao.bigx.web.common.advice;
 
 import com.cqcnihao.bigx.common.IResult;
 import com.cqcnihao.bigx.common.Result;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -31,14 +29,9 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 @Order(Ordered.HIGHEST_PRECEDENCE + 100)
 public class ResultResponseAdvice implements ResponseBodyAdvice<Object> {
 
-    private static final Logger log = LoggerFactory.getLogger(ResultResponseAdvice.class);
-
     @Override
     public boolean supports(MethodParameter returnType, Class<? extends HttpMessageConverter<?>> converterType) {
-        boolean isIResult = IResult.class.isAssignableFrom(returnType.getParameterType());
-        log.info("ResultResponseAdvice.supports: returnType={}, isIResult={}",
-                returnType.getParameterType().getSimpleName(), isIResult);
-        return !isIResult;
+        return !IResult.class.isAssignableFrom(returnType.getParameterType());
     }
 
     @Override
@@ -46,8 +39,6 @@ public class ResultResponseAdvice implements ResponseBodyAdvice<Object> {
                                   MediaType selectedContentType,
                                   Class<? extends HttpMessageConverter<?>> selectedConverterType,
                                   ServerHttpRequest request, ServerHttpResponse response) {
-        log.info("ResultResponseAdvice.beforeBodyWrite: body={}, type={}",
-                body, body != null ? body.getClass().getSimpleName() : "null");
         if (body == null) {
             return Result.success();
         }

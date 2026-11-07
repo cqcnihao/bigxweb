@@ -51,6 +51,12 @@ public class GatewayValidationProperties {
 
     private String internalHeaderValue;
 
+    /** 网关校验通过后是否继续校验登录态（默认开启，白名单路径除外） */
+    private boolean requireLogin = true;
+
+    /** 无需登录态校验的路径（登录、验证码、公钥、文档等公开接口） */
+    private List<String> loginExcludePaths = new ArrayList<>();
+
     public GatewayValidationProperties() {
         requiredHeaders.add("X-Gateway-Name");
         requiredHeaders.add("X-Trace-Id");
@@ -60,6 +66,20 @@ public class GatewayValidationProperties {
         excludePaths.add("/swagger-ui/**");
         excludePaths.add("/doc.html");
         excludePaths.add("/webjars/**");
-        excludePaths.add("/druid/**");
+        // 注意：Druid 监控页（/druid/**）默认关闭（druid-defaults.yml 的 DRUID_STAT_ENABLED 默认 false），
+        // 且故意不加入网关校验排除清单，避免监控台被直连访问；如确需启用请仅在内网暴露。
+
+        loginExcludePaths.add("/auth/login");
+        loginExcludePaths.add("/auth/captcha");
+        loginExcludePaths.add("/auth/public-key");
+        loginExcludePaths.add("/crypto/sm2/public-key");
+        loginExcludePaths.add("/actuator/health");
+        loginExcludePaths.add("/error");
+        loginExcludePaths.add("/favicon.ico");
+        loginExcludePaths.add("/swagger-resources/**");
+        loginExcludePaths.add("/v3/api-docs/**");
+        loginExcludePaths.add("/swagger-ui/**");
+        loginExcludePaths.add("/doc.html");
+        loginExcludePaths.add("/webjars/**");
     }
 }

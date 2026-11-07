@@ -1,1 +1,2 @@
 com.cqcnihao.bigx.encrypt.BigEncryptAutoConfiguration
+com.cqcnihao.bigx.encrypt.BigEncryptRedisAutoConfiguration

@@ -65,6 +65,13 @@
             <artifactId>bcprov-jdk18on</artifactId>
         </dependency>
 
+        <!-- Redis 防重放（可选）：宿主应用未引入 Redis 时自动回退到 JVM 内存实现 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- 单元测试 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

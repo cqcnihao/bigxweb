@@ -1,8 +1,11 @@
 package com.cqcnihao.bigx.gateway.filter;
 
+import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
+import org.springframework.core.env.Environment;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 
@@ -18,17 +21,40 @@ import java.util.UUID;
  * 必须配置在路由的 StripPrefix 之后：签名负载中的 URI 必须是
  * 下游服务实际收到的路径（StripPrefix 会先行改写请求路径）。
  */
+@Slf4j
 @Component
 public class SignRequestGatewayFilterFactory extends AbstractGatewayFilterFactory<SignRequestGatewayFilterFactory.Config> {
 
     private static final String GATEWAY_NAME = "big-gateway";
     private static final String GATEWAY_VERSION = "1.0.0";
+    private static final String SECRET_PLACEHOLDER = "REPLACE_ME_IN_PROD_GATEWAY_SECRET";
+    private static final String DEV_DEFAULT_SECRET = "dev-gateway-secret-do-not-use-in-prod";
 
     @Value("${gateway.validation.secret:}")
     private String secret;
 
-    public SignRequestGatewayFilterFactory() {
+    private final Environment environment;
+
+    public SignRequestGatewayFilterFactory(Environment environment) {
         super(Config.class);
+        this.environment = environment;
+    }
+
+    /** 生产环境禁止使用空值 / 占位符 / 开发默认密钥，避免签名形同虚设 */
+    @PostConstruct
+    public void securityCheck() {
+        boolean invalid = secret == null || secret.isBlank()
+                || SECRET_PLACEHOLDER.equals(secret) || DEV_DEFAULT_SECRET.equals(secret);
+        if (!invalid) {
+            return;
+        }
+        for (String profile : environment.getActiveProfiles()) {
+            if ("prod".equalsIgnoreCase(profile) || "production".equalsIgnoreCase(profile)) {
+                throw new IllegalStateException("[SECURITY] 生产环境必须配置真实的网关签名密钥："
+                        + "请通过环境变量 GATEWAY_VALIDATION_SECRET 或 gateway.validation.secret 注入");
+            }
+        }
+        log.warn("[SECURITY] 网关签名密钥未配置或仍为开发默认值，仅可用于本地开发环境");
     }
 
     @Override

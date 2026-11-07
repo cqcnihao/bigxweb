@@ -77,7 +77,8 @@ spring:
         
       # ===== StatViewServlet配置 =====
       stat-view-servlet:
-        enabled: true
+        # 监控页默认关闭；确需启用时通过 DRUID_STAT_ENABLED=true 显式打开，并务必修改默认账号
+        enabled: ${DRUID_STAT_ENABLED:false}
         url-pattern: /druid/*
         # 登录用户名密码（生产环境请修改）
         login-username: ${DRUID_USERNAME:admin}

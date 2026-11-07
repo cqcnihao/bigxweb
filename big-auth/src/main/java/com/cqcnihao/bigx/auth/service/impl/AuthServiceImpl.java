@@ -9,12 +9,15 @@ import com.cqcnihao.bigx.auth.mapper.SysUserMapper;
 import com.cqcnihao.bigx.auth.service.AuthService;
 import com.cqcnihao.bigx.core.exception.BusinessException;
 import com.wf.captcha.SpecCaptcha;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -35,16 +38,28 @@ public class AuthServiceImpl implements AuthService {
     private static final int MAX_FAIL_COUNT = 5;
     /** 账号锁定时长（分钟） */
     private static final long LOCK_MINUTES = 10;
+    /** 同一 IP 登录失败次数上限（防止换账号爆破，也防止恶意锁死他人账号） */
+    private static final int MAX_IP_FAIL_COUNT = 20;
+    /** IP 维度失败计数窗口（分钟） */
+    private static final long IP_FAIL_WINDOW_MINUTES = 10;
+    /** 同一 IP 每分钟验证码请求上限 */
+    private static final int MAX_CAPTCHA_PER_MINUTE = 30;
 
     private static final String CAPTCHA_KEY_PREFIX = "auth:captcha:";
     private static final String LOGIN_FAIL_PREFIX = "auth:login:fail:";
     private static final String LOGIN_LOCK_PREFIX = "auth:login:lock:";
+    private static final String CAPTCHA_IP_PREFIX = "auth:captcha:ip:";
+    private static final String LOGIN_IP_FAIL_PREFIX = "auth:login:ip:";
 
     private final SysUserMapper userMapper;
     private final StringRedisTemplate redisTemplate;
 
     @Override
     public Map<String, String> captcha() {
+        String ip = resolveClientIp();
+        checkIpRateLimit(CAPTCHA_IP_PREFIX + ip, MAX_CAPTCHA_PER_MINUTE, 1,
+                "验证码请求过于频繁，请稍后再试");
+
         SpecCaptcha captcha = new SpecCaptcha(130, 48, 4);
         String key = UUID.randomUUID().toString();
         redisTemplate.opsForValue().set(CAPTCHA_KEY_PREFIX + key,
@@ -57,6 +72,12 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public LoginVO login(LoginDTO dto) {
+        String ip = resolveClientIp();
+        if (isIpBlocked(ip)) {
+            log.warn("IP {} 登录尝试过于频繁，已临时拒绝", ip);
+            throw new BusinessException("429", "登录尝试过于频繁，请稍后再试");
+        }
+
         verifyCaptcha(dto.getCaptchaKey(), dto.getCaptchaCode());
 
         String username = dto.getUsername();
@@ -67,7 +88,7 @@ public class AuthServiceImpl implements AuthService {
         SysUser user = userMapper.selectByUsernameWithRoles(username);
         // 用户不存在与密码错误统一报错并计数，避免暴露账号是否存在
         if (user == null || !verifyPassword(dto.getPassword(), user.getPassword())) {
-            recordLoginFail(username);
+            recordLoginFail(username, ip);
             throw new BusinessException("401", "用户名或密码错误");
         }
         if (user.getStatus() != null && user.getStatus() != 1) {
@@ -137,7 +158,7 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
-    private void recordLoginFail(String username) {
+    private void recordLoginFail(String username, String ip) {
         String failKey = LOGIN_FAIL_PREFIX + username;
         Long count = redisTemplate.opsForValue().increment(failKey);
         if (count != null && count == 1L) {
@@ -148,6 +169,70 @@ public class AuthServiceImpl implements AuthService {
             redisTemplate.delete(failKey);
             log.warn("账号 {} 连续登录失败 {} 次，锁定 {} 分钟", username, MAX_FAIL_COUNT, LOCK_MINUTES);
         }
+        recordIpFail(ip);
+    }
+
+    /** IP 维度失败计数：不锁具体账号，只限制该来源在窗口期内的登录尝试总量 */
+    private void recordIpFail(String ip) {
+        String ipKey = LOGIN_IP_FAIL_PREFIX + ip;
+        Long count = redisTemplate.opsForValue().increment(ipKey);
+        if (count != null && count == 1L) {
+            redisTemplate.expire(ipKey, IP_FAIL_WINDOW_MINUTES, TimeUnit.MINUTES);
+        }
+        if (count != null && count >= MAX_IP_FAIL_COUNT) {
+            log.warn("IP {} 登录失败达到 {} 次，{} 分钟内拒绝其登录请求",
+                    ip, MAX_IP_FAIL_COUNT, IP_FAIL_WINDOW_MINUTES);
+        }
+    }
+
+    private boolean isIpBlocked(String ip) {
+        String value = redisTemplate.opsForValue().get(LOGIN_IP_FAIL_PREFIX + ip);
+        if (value == null) {
+            return false;
+        }
+        try {
+            return Long.parseLong(value) >= MAX_IP_FAIL_COUNT;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    /** 固定窗口限流：首次写入时设置窗口 TTL，超限直接抛出 429 */
+    private void checkIpRateLimit(String key, int max, long windowMinutes, String message) {
+        Long count = redisTemplate.opsForValue().increment(key);
+        if (count != null && count == 1L) {
+            redisTemplate.expire(key, windowMinutes, TimeUnit.MINUTES);
+        }
+        if (count != null && count > max) {
+            throw new BusinessException("429", message);
+        }
+    }
+
+    /**
+     * 解析客户端 IP。
+     * <p>
+     * 经网关转发时 Spring Cloud Gateway 会把真实来源追加到 X-Forwarded-For 末尾，
+     * 而首段可被客户端伪造（用于绕过按 IP 的限流），因此这里取最后一段。
+     */
+    private String resolveClientIp() {
+        ServletRequestAttributes attributes =
+                (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        if (attributes == null) {
+            return "unknown";
+        }
+        HttpServletRequest request = attributes.getRequest();
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isBlank() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("X-Real-IP");
+        }
+        if (ip == null || ip.isBlank() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        if (ip != null && ip.contains(",")) {
+            String[] parts = ip.split(",");
+            ip = parts[parts.length - 1].trim();
+        }
+        return StringUtils.hasText(ip) ? ip : "unknown";
     }
 
     private void clearLoginFail(String username) {

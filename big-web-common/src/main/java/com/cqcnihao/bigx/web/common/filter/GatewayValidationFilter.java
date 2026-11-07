@@ -2,6 +2,8 @@ package com.cqcnihao.bigx.web.common.filter;
 
 import com.cqcnihao.bigx.common.Result;
 import com.cqcnihao.bigx.web.common.config.GatewayValidationProperties;
+import cn.dev33.satoken.SaManager;
+import cn.dev33.satoken.stp.StpUtil;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -11,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.env.Environment;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
@@ -37,27 +40,51 @@ public class GatewayValidationFilter extends OncePerRequestFilter {
 
     private final GatewayValidationProperties properties;
     private final ObjectMapper objectMapper;
+    private final Environment environment;
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
     public GatewayValidationFilter(GatewayValidationProperties properties,
-                                   ObjectProvider<ObjectMapper> objectMapperProvider) {
+                                   ObjectProvider<ObjectMapper> objectMapperProvider,
+                                   Environment environment) {
         this.properties = properties;
+        this.environment = environment;
         ObjectMapper existing = objectMapperProvider.getIfAvailable();
         this.objectMapper = existing != null ? existing : new ObjectMapper();
     }
 
     private static final String SECRET_PLACEHOLDER = "REPLACE_ME_IN_PROD_GATEWAY_SECRET";
+    private static final String DEV_DEFAULT_SECRET = "dev-gateway-secret-do-not-use-in-prod";
 
     @PostConstruct
     public void securityCheck() {
-        String secret = properties.getSecret();
-        if (secret == null || secret.isBlank() || SECRET_PLACEHOLDER.equals(secret)) {
-            log.warn("╔══════════════════════════════════════════════════════════════╗");
-            log.warn("║  [SECURITY] 网关签名密钥未配置或仍为默认占位符!                 ║");
-            log.warn("║  生产环境必须通过环境变量 GATEWAY_VALIDATION_SECRET 或         ║");
-            log.warn("║  application.yml gateway.validation.secret 配置真实密钥。      ║");
-            log.warn("╚══════════════════════════════════════════════════════════════╝");
+        if (!properties.isSignatureEnabled()) {
+            return;
         }
+        String secret = properties.getSecret();
+        boolean invalid = secret == null || secret.isBlank()
+                || SECRET_PLACEHOLDER.equals(secret) || DEV_DEFAULT_SECRET.equals(secret);
+        if (!invalid) {
+            return;
+        }
+        if (isProdProfile()) {
+            throw new IllegalStateException("[SECURITY] 生产环境必须配置真实的网关签名密钥："
+                    + "请通过环境变量 GATEWAY_VALIDATION_SECRET 或 gateway.validation.secret 注入，"
+                    + "禁止使用空值 / 占位符 / 开发默认值");
+        }
+        log.warn("╔══════════════════════════════════════════════════════════════╗");
+        log.warn("║  [SECURITY] 网关签名密钥未配置或仍为开发默认值!                 ║");
+        log.warn("║  生产环境必须通过环境变量 GATEWAY_VALIDATION_SECRET 或         ║");
+        log.warn("║  application.yml gateway.validation.secret 配置真实密钥。      ║");
+        log.warn("╚══════════════════════════════════════════════════════════════╝");
+    }
+
+    private boolean isProdProfile() {
+        for (String profile : environment.getActiveProfiles()) {
+            if ("prod".equalsIgnoreCase(profile) || "production".equalsIgnoreCase(profile)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -134,7 +161,52 @@ public class GatewayValidationFilter extends OncePerRequestFilter {
             }
         }
 
+        // 下游二次登录态校验：即使请求已通过网关签名，也要求携带有效 token，
+        // 防止网关鉴权被绕过（多实例/内部直连）后直接访问业务接口
+        if (properties.isRequireLogin() && !isLoginExcludedPath(requestURI) && !hasValidLogin(request)) {
+            log.warn("[GatewayFilter] 下游登录态校验失败 | Path: {} | IP: {}", requestURI, getClientIp(request));
+            reject(response, 401, "未登录或登录已过期");
+            return;
+        }
+
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isLoginExcludedPath(String requestURI) {
+        if (properties.getLoginExcludePaths() == null || properties.getLoginExcludePaths().isEmpty()) {
+            return false;
+        }
+        for (String pattern : properties.getLoginExcludePaths()) {
+            if (pathMatcher.match(pattern, requestURI)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 校验登录态。
+     * <p>
+     * 本过滤器在 DispatcherServlet 之前执行，此时 Sa-Token 的请求上下文尚未建立，
+     * 因此不能用 {@code StpUtil.checkLogin()}，只能按 token 直查 DAO 中的 token→loginId 映射。
+     */
+    private boolean hasValidLogin(HttpServletRequest request) {
+        String tokenName;
+        try {
+            tokenName = SaManager.getConfig().getTokenName();
+        } catch (Exception e) {
+            tokenName = "Authorization";
+        }
+        String token = request.getHeader(tokenName);
+        if (token == null || token.isBlank()) {
+            return false;
+        }
+        try {
+            return StpUtil.getLoginIdByToken(token) != null;
+        } catch (Exception e) {
+            log.warn("[GatewayFilter] 登录态查询异常 | Path: {} | {}", request.getRequestURI(), e.getMessage());
+            return false;
+        }
     }
 
     private boolean isExcludedPath(String requestURI) {
@@ -159,8 +231,11 @@ public class GatewayValidationFilter extends OncePerRequestFilter {
             return false;
         }
         String expected = properties.getInternalHeaderValue();
-        if (expected == null || expected.isEmpty()) {
-            return true;
+        // 未配置期望值时必须视为「非内部调用」：否则任意带该请求头的外部请求都能绕过网关校验
+        if (expected == null || expected.isBlank()) {
+            log.warn("[GatewayFilter] 未配置 gateway.validation.internal-header-value，"
+                    + "忽略请求头 {} 的内部调用声明 | Path: {}", headerName, request.getRequestURI());
+            return false;
         }
         return MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8), headerValue.getBytes(StandardCharsets.UTF_8));
     }

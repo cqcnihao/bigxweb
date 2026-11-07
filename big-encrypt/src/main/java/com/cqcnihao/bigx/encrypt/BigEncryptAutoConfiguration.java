@@ -16,6 +16,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -60,11 +61,14 @@ public class BigEncryptAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    @ConditionalOnMissingClass("org.springframework.data.redis.core.StringRedisTemplate")
     public ReplayGuard smReplayGuard(EncryptProperties properties) {
-        if (properties.isReplayCheck()) {
-            log.warn("使用 JVM 内存版 InMemoryReplayGuard 作为防重放实现 —— 仅单实例部署有效。" +
-                    "多实例/集群环境请自行提供基于 Redis 的 ReplayGuard Bean，否则重放防护将静默失效。");
-        }
+        return inMemoryReplayGuard(properties);
+    }
+
+    private ReplayGuard inMemoryReplayGuard(EncryptProperties properties) {
+        log.warn("未检测到可用的 Redis，防重放回退为 JVM 内存版 InMemoryReplayGuard —— 仅单实例部署有效。" +
+                "多实例/集群环境请引入 spring-boot-starter-data-redis，否则重放防护将静默失效。");
         return new InMemoryReplayGuard(Math.max(properties.getTimestampValidity() * 2, 60_000L));
     }
 
