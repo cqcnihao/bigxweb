@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<flow>
+    <!-- 系统健康检查链 -->
+    <chain name="healthCheckChain">
+        THEN(
+        cpuHealthCheck,
+        memoryHealthCheck,
+        diskHealthCheck,
+        networkHealthCheck,
+        systemHealthCheck
+        );
+    </chain>
+
+    <!-- 性能监控链 -->
+    <chain name="performanceMonitorChain">
+        THEN(
+        cpuPerformanceMonitor,
+        memoryPerformanceMonitor,
+        diskPerformanceMonitor,
+        networkPerformanceMonitor
+        );
+    </chain>
+
+    <!-- 告警规则链 -->
+    <chain name="alertChain">
+        WHEN(
+        cpuAlertCheck,
+        memoryAlertCheck,
+        diskAlertCheck,
+        processAlertCheck
+        );
+    </chain>
+
+    <!-- 自动修复链 -->
+    <chain name="autoFixChain">
+        SWITCH(autoFixDecision).TO(
+        cpuHighUsageFix,
+        memoryHighUsageFix,
+        diskHighUsageFix
+        );
+    </chain>
+
+    <!-- 系统信息收集链 -->
+    <chain name="systemInfoCollectChain">
+        THEN(
+        collectOsInfo,
+        collectCpuInfo,
+        collectMemoryInfo,
+        collectDiskInfo,
+        collectNetworkInfo,
+        assembleSystemInfo
+        );
+    </chain>
+</flow>

@@ -1,0 +1,64 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: big-gateway
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:public}
+    gateway:
+      # SCG 5.0 起属性前缀从 spring.cloud.gateway 迁移到 spring.cloud.gateway.server.webflux
+      server:
+        webflux:
+          discovery:
+            locator:
+              enabled: true
+              lower-case-service-id: true
+          routes:
+            - id: big-auth
+              uri: lb://big-auth
+              predicates:
+                - Path=/auth/**
+              filters:
+                - StripPrefix=0
+                # 签名必须在 StripPrefix 之后计算，保证签名 URI 与下游收到的一致
+                - SignRequest
+
+            # SM2 公钥下发等加密握手端点，由 big-auth 承载（控制器在 big-encrypt 模块）
+            - id: big-auth-crypto
+              uri: lb://big-auth
+              predicates:
+                - Path=/crypto/**
+              filters:
+                - StripPrefix=0
+                - SignRequest
+
+            - id: big-business
+              uri: lb://big-business
+              predicates:
+                - Path=/api/**
+              filters:
+                - StripPrefix=1
+                - SignRequest
+
+# 与下游 big-web-common GatewayValidationFilter 共享的 HMAC 密钥，生产环境必须走环境变量
+gateway:
+  validation:
+    secret: ${GATEWAY_VALIDATION_SECRET:dev-gateway-secret-do-not-use-in-prod}
+
+sa-token:
+  token-name: Authorization
+  timeout: 86400
+  active-timeout: -1
+  is-concurrent: true
+  is-share: true
+  token-style: uuid
+  is-log: false
+
+logging:
+  level:
+    org.springframework.cloud.gateway: INFO
+    reactor.netty.http.client: WARN

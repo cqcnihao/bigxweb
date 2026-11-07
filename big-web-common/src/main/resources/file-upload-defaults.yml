@@ -1,0 +1,31 @@
+# ========================================
+# 文件上传通用配置
+# ========================================
+
+# 文件上传配置
+spring:
+  servlet:
+    multipart:
+      enabled: true
+      # 单个文件最大大小
+      max-file-size: 10MB
+      # 请求最大大小
+      max-request-size: 50MB
+      # 文件大小阈值，超过此值将写入磁盘
+      file-size-threshold: 2KB
+      # 临时文件目录
+      location: ${java.io.tmpdir}
+
+# 自定义文件上传配置
+file:
+  upload:
+    # 是否启用文件上传
+    enabled: true
+    # 上传目录（相对路径）
+    path: ./uploads/
+    # 允许的文件类型
+    allowed-types: jpg,jpeg,png,gif,pdf,doc,docx,xls,xlsx,zip,rar
+    # 单个文件最大大小（覆盖 Spring 默认）
+    max-size: 10MB
+    # 是否生成唯一文件名
+    unique-name: true

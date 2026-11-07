@@ -1,0 +1,75 @@
+# ============================================================
+# Knife4j API 文档通用配置
+# 由 big-utils 提供，各业务模块可继承或覆盖
+# 自动生成标准化、美观的 API 接口文档
+# ============================================================
+
+springdoc:
+  # OpenAPI 基础配置
+  api-docs:
+    enabled: true
+    # API 文档路径
+    path: /v3/api-docs
+  # Swagger UI 配置
+  swagger-ui:
+    enabled: true
+    # Swagger UI 路径
+    path: /swagger-ui.html
+    # 排序方式
+    operations-sorter: method
+    tags-sorter: alpha
+  # 包扫描路径（模块需覆盖）
+  packages-to-scan: com.cqcnihao
+  # 路径匹配规则
+  paths-to-match: /**
+
+# Knife4j 增强配置
+knife4j:
+  # 是否启用
+  enable: true
+  # 生产环境建议关闭
+  production: ${KNIFE4J_PRODUCTION:false}
+  
+  # 增强功能
+  setting:
+    # 开启动态请求参数
+    enable-dynamic-parameter: true
+    # 开启调试
+    enable-debug: true
+    # 开启缓存
+    enable-cache: true
+    # 首页 Footer 自定义
+    enable-footer: false
+    # 首页 Footer 自定义内容
+    enable-footer-custom: false
+    # 接口排序
+    enable-sort: true
+    # 显示模型
+    enable-document-manage: true
+    # 语言配置
+    language: zh_cn
+  
+  # OpenAPI 元信息配置（模块可覆盖）
+  openapi:
+    # 文档标题
+    title: ${spring.application.name:bigweb} API 文档
+    # 文档描述
+    description: Bigweb 项目 RESTful API 接口文档
+    # 版本
+    version: 1.0.0
+    # 联系方式
+    contact:
+      name: Bigweb Team
+      email: support@cqcnihao.com
+      url: https://cqcnihao.com
+    # 许可证
+    license:
+      name: Apache 2.0
+      url: https://www.apache.org/licenses/LICENSE-2.0.html
+    # 分组配置
+    group:
+      default:
+        group-name: 默认分组
+        api-rule: package
+        api-rule-resources:
+          - com.cqcnihao

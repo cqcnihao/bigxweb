@@ -1,0 +1,21 @@
+# Maven
+target/
+*.class
+
+# IDE
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+.vscode/
+
+# 日志与临时文件
+logs/
+*.log
+*.tmp
+dump.rdb
+
+# 本地环境配置（含密钥，禁止入库）
+.env
+application-local.yml

@@ -1,0 +1,88 @@
+# ============================================================
+# Spring Boot Actuator 监控配置
+# 由 big-utils 提供，各业务模块可继承或覆盖
+# 提供健康检查、指标收集、性能监控等功能
+# ============================================================
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # 暴露的端点
+        include: health,info,metrics,prometheus,env,loggers
+        # 排除的端点
+        exclude: 
+      # 端点基础路径
+      base-path: /actuator
+    jmx:
+      exposure:
+        # JMX暴露的端点
+        include: health,info
+  
+  # 端点配置
+  endpoint:
+    # 健康检查配置
+    health:
+      show-details: when-authorized
+      show-components: always
+      # 数据库健康检查
+      db:
+        enabled: true
+      # Redis健康检查
+      redis:
+        enabled: true
+    
+    # 环境配置
+    env:
+      show-values: when-authorized
+      keys-to-sanitize:
+        - password
+        - secret
+        - key
+        - token
+        - .*credentials.*
+    
+    # 日志配置
+    loggers:
+      enabled: true
+  
+  # 信息配置
+  info:
+    env:
+      enabled: true
+    java:
+      enabled: true
+    os:
+      enabled: true
+  
+  # 健康指标配置
+  health:
+    defaults:
+      enabled: true
+    # 数据库健康检查
+    db:
+      enabled: true
+    # 磁盘空间健康检查
+    diskSpace:
+      enabled: true
+      threshold: 10MB
+    # Ping健康检查
+    ping:
+      enabled: true
+  
+  # 指标配置
+  metrics:
+    tags:
+      application: ${spring.application.name:unknown}
+    # 启用所有内置指标
+    enable:
+      all: true
+    # 导出配置
+    export:
+      # Prometheus导出
+      prometheus:
+        enabled: true
+  
+  # 日志配置
+  logging:
+    enabled: true

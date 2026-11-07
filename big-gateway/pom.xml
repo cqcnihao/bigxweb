@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.cqcnihao.bigx</groupId>
+        <artifactId>root</artifactId>
+        <version>1.4.7-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>big-gateway</artifactId>
+    <packaging>jar</packaging>
+
+    <name>big-gateway</name>
+    <description>API 网关：路由转发、鉴权、限流、国密加解密入口</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <!-- Cloud 2025.x 起旧 spring-cloud-starter-gateway 已重命名为 -server-webflux -->
+            <artifactId>spring-cloud-starter-gateway-server-webflux</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-loadbalancer</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
+        </dependency>
+
+        <!-- WebFlux 网关只能使用 reactor 版 starter；
+             servlet 版会注册同名 SaTokenContext Bean 导致启动冲突 -->
+        <dependency>
+            <groupId>cn.dev33</groupId>
+            <artifactId>sa-token-reactor-spring-boot3-starter</artifactId>
+            <exclusions>
+                <!-- sa-token-jackson 是 Jackson 2 系插件（经 autoconfig 传递引入、SPI 自动装配），
+                     Boot 4 = Jackson 3 环境下 com.fasterxml.jackson 类不存在，启动即
+                     NoClassDefFoundError；序列化由 big-common 的 Jackson3SaSerializerTemplate 负责 -->
+                <exclusion>
+                    <groupId>cn.dev33</groupId>
+                    <artifactId>sa-token-jackson</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!-- 网关鉴权需要与 big-auth 共享 Redis 中的 token 会话：
+             JacksonSaTokenDao + Jackson3SaSerializerTemplate 在 big-common -->
+        <dependency>
+            <groupId>com.cqcnihao.bigx</groupId>
+            <artifactId>big-common</artifactId>
+            <version>${big.project.version}</version>
+            <exclusions>
+                <!-- WebFlux 下只能有 reactor 版 SaTokenContext，排除 servlet 版防止 Bean 冲突 -->
+                <exclusion>
+                    <groupId>cn.dev33</groupId>
+                    <artifactId>sa-token-spring-boot3-starter</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>${project.artifactId}</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

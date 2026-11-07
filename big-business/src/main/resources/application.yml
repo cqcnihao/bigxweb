@@ -1,0 +1,75 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: big-business
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/${DB_NAME:big_business}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:}
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DB:0}
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:public}
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.cqcnihao.bigx.business.entity
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+sa-token:
+  token-name: Authorization
+  timeout: 86400
+  active-timeout: -1
+  is-concurrent: true
+  is-share: true
+  token-style: uuid
+  is-log: false
+
+# 只放行经网关签名转发的请求，密钥必须与 big-gateway 侧一致
+gateway:
+  validation:
+    secret: ${GATEWAY_VALIDATION_SECRET:dev-gateway-secret-do-not-use-in-prod}
+
+big:
+  web:
+    # CORS 由网关统一处理，下游不能再加，否则 Access-Control-Allow-Origin 重复
+    cors-enabled: false
+
+  encrypt:
+    enabled: ${BIG_ENCRYPT_ENABLED:false}
+    interceptor-enabled: true
+    replay-check: ${BIG_ENCRYPT_REPLAY_CHECK:true}
+    sm4:
+      default-key-id: ${SM4_DEFAULT_KEY_ID:v1}
+      keys:
+        v1: ${SM4_KEY_V1:}
+    sm2:
+      public-key: ${SM2_PUBLIC_KEY:}
+      private-key: ${SM2_PRIVATE_KEY:}
+    sm3:
+      mac-key: ${SM3_MAC_KEY:}
+
+logging:
+  level:
+    com.cqcnihao.bigx.business: DEBUG
+    com.baomidou.mybatisplus: INFO

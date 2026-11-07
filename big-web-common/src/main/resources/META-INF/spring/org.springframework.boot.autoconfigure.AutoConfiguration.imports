@@ -1,0 +1,13 @@
+com.cqcnihao.bigx.web.common.config.DruidDataSourceConfig
+com.cqcnihao.bigx.web.common.config.CorsConfig
+com.cqcnihao.bigx.web.common.config.WebMvcConfig
+com.cqcnihao.bigx.web.common.config.CookieConfig
+com.cqcnihao.bigx.web.common.config.FileUploadConfig
+com.cqcnihao.bigx.web.common.config.Knife4jConfig
+com.cqcnihao.bigx.web.common.config.GatewayValidationProperties
+com.cqcnihao.bigx.web.common.config.UnifiedErrorControllerConfig
+com.cqcnihao.bigx.web.common.advice.ResultResponseAdvice
+com.cqcnihao.bigx.web.common.filter.XssFilter
+com.cqcnihao.bigx.web.common.filter.GatewayValidationFilter
+com.cqcnihao.bigx.web.common.health.DatabaseHealthIndicator
+com.cqcnihao.bigx.web.common.health.RedisHealthIndicator

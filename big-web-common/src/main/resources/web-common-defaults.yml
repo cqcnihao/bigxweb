@@ -1,0 +1,75 @@
+# ========================================
+# big-web-common 通用配置
+# ========================================
+
+# 应用配置
+spring:
+  autoconfigure:
+    exclude:
+      - cn.dev33.satoken.dao.SaTokenDaoForRedisTemplate
+      - cn.dev33.satoken.dao.SaTokenDaoForRedisTemplateAutoConfiguration
+  # 数据源配置：通用库不内置具体连接信息，由各应用自行配置 spring.datasource.url
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${DB_USER:}
+    password: ${DB_PASSWORD:}
+  
+  # 文件上传配置
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 50MB
+
+# Knife4j API文档配置
+knife4j:
+  enable: true
+  production: false
+  setting:
+    enable-dynamic-parameter: true
+    enable-debug: true
+    language: zh_cn
+
+# 加密配置：密钥禁止入库，通过环境变量注入（AesCryptoUtil.generateKey() 生成）
+crypto:
+  aes:
+    enabled: ${CRYPTO_AES_ENABLED:false}
+    secret-key: ${AES_SECRET_KEY:}
+    algorithm: "AES/GCM/NoPadding"
+
+# 网关验证配置
+gateway:
+  validation:
+    enabled: true                    # 是否启用网关验证（生产环境建议开启）
+    strict-mode: true                # 严格模式：true=拒绝直连请求，false=仅警告
+    required-headers:                # 必须存在的请求头
+      - X-Gateway-Name
+      - X-Trace-Id
+    exclude-paths:
+      - /swagger-resources/**
+      - /v3/api-docs/**
+      - /swagger-ui/**
+      - /doc.html
+
+# 日志配置
+logging:
+  level:
+    root: INFO
+    com.cqcnihao: DEBUG
+    com.cqcnihao.bigx.web.common: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{traceId}] - %msg%n"
+
+# Sa-Token 统一配置（所有业务模块与 big-auth 保持一致）
+sa-token:
+  token-name: Authorization
+  token-prefix: ""
+  token-style: uuid
+  timeout: 2592000
+  is-read-header: true
+  is-read-cookie: false
+  is-read-body: false
+  active-timeout: -1
+  is-concurrent: true
+  is-share: false
