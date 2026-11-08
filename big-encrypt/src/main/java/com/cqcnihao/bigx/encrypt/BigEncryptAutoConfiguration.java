@@ -22,11 +22,14 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplicat
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.env.Environment;
 
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import jakarta.annotation.PostConstruct;
+
+import java.util.Arrays;
 
 /**
  * big-Encrypt 自动装配
@@ -50,6 +53,15 @@ import jakarta.annotation.PostConstruct;
 @Import(BigEncryptAutoConfiguration.SmCryptoWebMvcConfigurer.class)
 public class BigEncryptAutoConfiguration {
 
+    /** 与各服务 yml 中 SM4 密钥的 dev 兜底默认值保持一致，仅限本地开发 */
+    public static final String DEV_DEFAULT_SM4_KEY = "ZGV2LXNtNC1kZXYta2V5IQ==";
+
+    private final Environment environment;
+
+    public BigEncryptAutoConfiguration(Environment environment) {
+        this.environment = environment;
+    }
+
     @PostConstruct
     public void init() {
         try {
@@ -57,6 +69,27 @@ public class BigEncryptAutoConfiguration {
         } catch (Exception e) {
             log.error("BouncyCastle Provider 注册失败，国密加解密将不可用", e);
         }
+        checkProdKeyGuard();
+    }
+
+    /**
+     * prod profile 下检测到 dev 默认 SM4 密钥时拒绝启动（与网关签名密钥守卫同范式）；
+     * 其他环境打印错误日志强提醒。
+     */
+    private void checkProdKeyGuard() {
+        var sm4 = environment.getProperty("big.encrypt.sm4.keys.v1", "");
+        boolean devDefault = sm4.isBlank() || DEV_DEFAULT_SM4_KEY.equals(sm4);
+        if (!devDefault) {
+            return;
+        }
+        boolean prod = Arrays.stream(environment.getActiveProfiles())
+                .anyMatch("prod"::equalsIgnoreCase);
+        if (prod) {
+            throw new IllegalStateException("[SECURITY] 生产环境必须通过环境变量 SM4_KEY_V1 注入真实的 SM4 密钥，"
+                    + "拒绝使用 dev 默认密钥或空密钥启动");
+        }
+        log.error("[SECURITY] 加密模块已启用但 SM4 密钥为空或 dev 默认值，仅限本地开发使用；"
+                + "生产环境必须通过环境变量 SM4_KEY_V1（16 字节 Base64）覆盖");
     }
 
     @Bean

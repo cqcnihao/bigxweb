@@ -92,13 +92,9 @@
             <scope>provided</scope>
         </dependency>
         
-        <!-- Sa-Token Redis 集成 -->
-        <dependency>
-            <groupId>cn.dev33</groupId>
-            <artifactId>sa-token-redis-jackson</artifactId>
-        </dependency>
-        
         <!-- Sa-Token JWT 集成（可选） -->
+        <!-- 不引入 sa-token-redis-jackson：其基于 Jackson 2，与 Boot 4 的 Jackson 3 冲突；
+             Redis 会话持久化统一由 big-common 的 JacksonSaTokenDao 承担 -->
         <dependency>
             <groupId>cn.dev33</groupId>
             <artifactId>sa-token-jwt</artifactId>

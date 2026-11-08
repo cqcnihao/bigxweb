@@ -6,6 +6,7 @@ import com.cqcnihao.bigx.business.dto.ProductDTO;
 import com.cqcnihao.bigx.business.entity.BizProduct;
 import com.cqcnihao.bigx.business.service.BizProductService;
 import com.cqcnihao.bigx.common.Result;
+import com.cqcnihao.bigx.encrypt.annotation.SmEncrypt;
 import com.cqcnihao.bigx.web.common.controller.BaseController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -13,11 +14,16 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * 加密全局化试点：类级 @SmEncrypt 使本 Controller 全部接口启用国密报文加解密
+ * （请求需 EncryptedRequest 信封，响应为 EncryptedPayload；明文豁免用 @SmPlain）。
+ */
 @Tag(name = "商品管理", description = "商品 CRUD 示例")
 @RestController
 @RequestMapping("/product")
 @RequiredArgsConstructor
 @SaCheckLogin
+@SmEncrypt
 public class BizProductController extends BaseController {
 
     private final BizProductService productService;

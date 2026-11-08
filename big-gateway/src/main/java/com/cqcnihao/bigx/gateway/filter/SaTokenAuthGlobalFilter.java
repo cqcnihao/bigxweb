@@ -35,7 +35,11 @@ public class SaTokenAuthGlobalFilter implements GlobalFilter, Ordered {
             "/crypto/sm2/public-key",
             "/doc.html",
             "/favicon.ico",
-            "/actuator/health"
+            "/actuator/health",
+            "/big-auth/auth/login",
+            "/big-auth/auth/captcha",
+            "/big-auth/auth/public-key",
+            "/big-auth/crypto/sm2/public-key"
     );
 
     /** 前缀白名单，仅用于明确的路径族 */

@@ -1,11 +1,14 @@
 package com.cqcnihao.bigx.auth.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
-import cn.dev33.satoken.stp.StpUtil;
 import com.cqcnihao.bigx.auth.dto.LoginDTO;
 import com.cqcnihao.bigx.auth.dto.LoginVO;
 import com.cqcnihao.bigx.auth.service.AuthService;
 import com.cqcnihao.bigx.common.Result;
+import com.cqcnihao.bigx.encrypt.annotation.SmEncrypt;
+import com.cqcnihao.bigx.encrypt.annotation.SmPlain;
+import com.cqcnihao.bigx.encrypt.client.CryptoConfigVO;
+import com.cqcnihao.bigx.encrypt.service.SmCryptoService;
 import com.cqcnihao.bigx.web.common.controller.BaseController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,9 +22,11 @@ import java.util.Map;
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
+@SmEncrypt
 public class AuthController extends BaseController {
 
     private final AuthService authService;
+    private final SmCryptoService cryptoService;
 
     @Operation(summary = "用户登录")
     @PostMapping("/login")
@@ -44,15 +49,17 @@ public class AuthController extends BaseController {
         return Result.success(authService.getCurrentUser());
     }
 
+    @SmPlain
     @Operation(summary = "生成图形验证码")
     @GetMapping("/captcha")
     public Result<Map<String, String>> captcha() {
         return Result.success(authService.captcha());
     }
 
-    @Operation(summary = "获取 Sa-Token 配置公钥（JWT 模式）")
+    @SmPlain
+    @Operation(summary = "获取国密加密配置（前端动态装载 SM4 密钥 / SM2 公钥）")
     @GetMapping("/public-key")
-    public Result<String> publicKey() {
-        return Result.success("");
+    public Result<CryptoConfigVO> cryptoConfig() {
+        return Result.success(cryptoService.toCryptoConfigVO());
     }
 }

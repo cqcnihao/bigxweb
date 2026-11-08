@@ -722,18 +722,6 @@
             </snapshots>
         </repository>
         <repository>
-            <id>mvnrepository</id>
-            <name>Spring Maven mvnrepository</name>
-            <url>https://mvnrepository.com/artifact</url>
-            <releases>
-                <enabled>true</enabled>
-            </releases>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-        </repository>
-
-        <repository>
             <id>artifacts.alfresco</id>
             <name>Spring Maven artifacts.alfresco</name>
             <url>https://artifacts.alfresco.com/nexus/content/repositories/public/</url>

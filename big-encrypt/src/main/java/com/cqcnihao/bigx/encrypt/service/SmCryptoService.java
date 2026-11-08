@@ -1,5 +1,6 @@
 package com.cqcnihao.bigx.encrypt.service;
 
+import com.cqcnihao.bigx.encrypt.client.CryptoConfigVO;
 import com.cqcnihao.bigx.encrypt.config.EncryptProperties;
 import com.cqcnihao.bigx.encrypt.core.Sm2;
 import com.cqcnihao.bigx.encrypt.core.Sm3;
@@ -254,5 +255,20 @@ public class SmCryptoService implements MessageCryptoService {
 
     public EncryptProperties getProperties() {
         return properties;
+    }
+
+    public CryptoConfigVO toCryptoConfigVO() {
+        CryptoConfigVO vo = new CryptoConfigVO();
+        EncryptProperties.Sm4Config sm4 = properties.getSm4();
+        EncryptProperties.Sm2Config sm2 = properties.getSm2();
+        vo.setSm4Alg(sm4.getAlg());
+        vo.setSm4DefaultKeyId(sm4.getDefaultKeyId());
+        vo.setSm4Keys(sm4.getKeys());
+        vo.setMacEnabled(sm4.isMacEnabled());
+        vo.setMacBinding(MAC_BINDING);
+        vo.setSm2PublicKey(sm2.getPublicKey());
+        vo.setSm2KeyId(sm2.getKeyId());
+        vo.setSm2Mode(sm2.getMode());
+        return vo;
     }
 }

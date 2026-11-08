@@ -12,6 +12,7 @@ import com.wf.captcha.SpecCaptcha;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.stereotype.Service;
@@ -34,16 +35,22 @@ public class AuthServiceImpl implements AuthService {
 
     /** 验证码有效期（分钟） */
     private static final long CAPTCHA_TTL_MINUTES = 5;
+
     /** 连续失败次数上限，达到后锁定账号 */
-    private static final int MAX_FAIL_COUNT = 5;
+    @Value("${big.auth.security.max-fail-count:5}")
+    private int maxFailCount = 5;
     /** 账号锁定时长（分钟） */
-    private static final long LOCK_MINUTES = 10;
+    @Value("${big.auth.security.lock-minutes:10}")
+    private long lockMinutes = 10;
     /** 同一 IP 登录失败次数上限（防止换账号爆破，也防止恶意锁死他人账号） */
-    private static final int MAX_IP_FAIL_COUNT = 20;
+    @Value("${big.auth.security.max-ip-fail-count:20}")
+    private int maxIpFailCount = 20;
     /** IP 维度失败计数窗口（分钟） */
-    private static final long IP_FAIL_WINDOW_MINUTES = 10;
+    @Value("${big.auth.security.ip-fail-window-minutes:10}")
+    private long ipFailWindowMinutes = 10;
     /** 同一 IP 每分钟验证码请求上限 */
-    private static final int MAX_CAPTCHA_PER_MINUTE = 30;
+    @Value("${big.auth.security.max-captcha-per-minute:30}")
+    private int maxCaptchaPerMinute = 30;
 
     private static final String CAPTCHA_KEY_PREFIX = "auth:captcha:";
     private static final String LOGIN_FAIL_PREFIX = "auth:login:fail:";
@@ -57,7 +64,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public Map<String, String> captcha() {
         String ip = resolveClientIp();
-        checkIpRateLimit(CAPTCHA_IP_PREFIX + ip, MAX_CAPTCHA_PER_MINUTE, 1,
+        checkIpRateLimit(CAPTCHA_IP_PREFIX + ip, maxCaptchaPerMinute, 1,
                 "验证码请求过于频繁，请稍后再试");
 
         SpecCaptcha captcha = new SpecCaptcha(130, 48, 4);
@@ -162,12 +169,12 @@ public class AuthServiceImpl implements AuthService {
         String failKey = LOGIN_FAIL_PREFIX + username;
         Long count = redisTemplate.opsForValue().increment(failKey);
         if (count != null && count == 1L) {
-            redisTemplate.expire(failKey, LOCK_MINUTES, TimeUnit.MINUTES);
+            redisTemplate.expire(failKey, lockMinutes, TimeUnit.MINUTES);
         }
-        if (count != null && count >= MAX_FAIL_COUNT) {
-            redisTemplate.opsForValue().set(LOGIN_LOCK_PREFIX + username, "1", LOCK_MINUTES, TimeUnit.MINUTES);
+        if (count != null && count >= maxFailCount) {
+            redisTemplate.opsForValue().set(LOGIN_LOCK_PREFIX + username, "1", lockMinutes, TimeUnit.MINUTES);
             redisTemplate.delete(failKey);
-            log.warn("账号 {} 连续登录失败 {} 次，锁定 {} 分钟", username, MAX_FAIL_COUNT, LOCK_MINUTES);
+            log.warn("账号 {} 连续登录失败 {} 次，锁定 {} 分钟", username, maxFailCount, lockMinutes);
         }
         recordIpFail(ip);
     }
@@ -177,11 +184,11 @@ public class AuthServiceImpl implements AuthService {
         String ipKey = LOGIN_IP_FAIL_PREFIX + ip;
         Long count = redisTemplate.opsForValue().increment(ipKey);
         if (count != null && count == 1L) {
-            redisTemplate.expire(ipKey, IP_FAIL_WINDOW_MINUTES, TimeUnit.MINUTES);
+            redisTemplate.expire(ipKey, ipFailWindowMinutes, TimeUnit.MINUTES);
         }
-        if (count != null && count >= MAX_IP_FAIL_COUNT) {
+        if (count != null && count >= maxIpFailCount) {
             log.warn("IP {} 登录失败达到 {} 次，{} 分钟内拒绝其登录请求",
-                    ip, MAX_IP_FAIL_COUNT, IP_FAIL_WINDOW_MINUTES);
+                    ip, maxIpFailCount, ipFailWindowMinutes);
         }
     }
 
@@ -191,7 +198,7 @@ public class AuthServiceImpl implements AuthService {
             return false;
         }
         try {
-            return Long.parseLong(value) >= MAX_IP_FAIL_COUNT;
+            return Long.parseLong(value) >= maxIpFailCount;
         } catch (NumberFormatException e) {
             return false;
         }

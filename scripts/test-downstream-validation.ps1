@@ -32,10 +32,13 @@ param(
     [string]$AuthHost    = "127.0.0.1:8081",
     [string]$BusinessHost = "127.0.0.1:8082",
     [string]$GatewayName = "big-gateway",
-    [string]$Secret      = "dev-gateway-secret-do-not-use-in-prod",
-    [string]$Username    = "admin",
-    [string]$Password    = "admin123",
-    [string]$RedisCli    = "F:\Redis-x64-3.2\redis-cli.exe",
+    # 签名密钥：优先取环境变量 GATEWAY_VALIDATION_SECRET，避免默认密钥入库
+    [string]$Secret      = $(if ($env:GATEWAY_VALIDATION_SECRET) { $env:GATEWAY_VALIDATION_SECRET } else { "dev-gateway-secret-do-not-use-in-prod" }),
+    # 登录凭据：优先取环境变量，仅用于本地回归
+    [string]$Username    = $(if ($env:TEST_USERNAME) { $env:TEST_USERNAME } else { "admin" }),
+    [string]$Password    = $(if ($env:TEST_PASSWORD) { $env:TEST_PASSWORD } else { "admin123" }),
+    # redis-cli 路径：优先取环境变量 REDIS_CLI
+    [string]$RedisCli    = $(if ($env:REDIS_CLI) { $env:REDIS_CLI } else { "redis-cli" }),
     [string]$BusinessPath = "/product/page?pageNum=1&pageSize=5",
     [string]$Origin      = "http://localhost:5173",
     [switch]$SkipLogin

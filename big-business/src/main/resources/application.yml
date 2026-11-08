@@ -23,6 +23,8 @@ spring:
       discovery:
         server-addr: ${NACOS_ADDR:127.0.0.1:8848}
         namespace: ${NACOS_NAMESPACE:public}
+        ip: ${NACOS_IP:192.168.115.164}
+        prefer-ip-address: true
 
 mybatis-plus:
   mapper-locations: classpath*:mapper/**/*.xml
@@ -58,16 +60,20 @@ big:
     cors-enabled: false
 
   encrypt:
-    enabled: ${BIG_ENCRYPT_ENABLED:false}
+    # 加密全局化试点第一步：默认开启（ANNOTATION 模式，仅标注 @SmEncrypt 的接口生效）
+    enabled: ${BIG_ENCRYPT_ENABLED:true}
     interceptor-enabled: true
     replay-check: ${BIG_ENCRYPT_REPLAY_CHECK:true}
     sm4:
       default-key-id: ${SM4_DEFAULT_KEY_ID:v1}
+      # dev 兜底密钥仅限本地开发；prod profile 检测到默认值/空值将拒绝启动，生产必须注入 SM4_KEY_V1（16 字节 Base64）
       keys:
-        v1: ${SM4_KEY_V1:}
+        v1: ${SM4_KEY_V1:ZGV2LXNtNC1kZXYta2V5IQ==}
+    # SM2 密钥对用于验签/会话密钥保护（@SmEncrypt(sign=true) 时必需）；生产必须通过环境变量注入
     sm2:
       public-key: ${SM2_PUBLIC_KEY:}
       private-key: ${SM2_PRIVATE_KEY:}
+    # 为空时回退为 SM4 密钥派生
     sm3:
       mac-key: ${SM3_MAC_KEY:}
 

@@ -9,6 +9,8 @@ spring:
       discovery:
         server-addr: ${NACOS_ADDR:127.0.0.1:8848}
         namespace: ${NACOS_NAMESPACE:public}
+        ip: ${NACOS_IP:192.168.115.164}
+        prefer-ip-address: true
     gateway:
       # SCG 5.0 起属性前缀从 spring.cloud.gateway 迁移到 spring.cloud.gateway.server.webflux
       server:

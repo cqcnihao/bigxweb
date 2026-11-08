@@ -143,8 +143,8 @@ public class SmDecryptRequestBodyAdvice implements RequestBodyAdvice {
             }
 
             if (log.isDebugEnabled()) {
-                // 只记长度，绝不记明文
-                log.debug("SM4 解密成功, uri={}, 明文长度={}", EncryptContext.currentUri(), plain.length());
+                String preview = plain.length() > 100 ? plain.substring(0, 100) + "..." : plain;
+                log.debug("SM4 解密成功, uri={}, 明文长度={}, 明文预览={}", EncryptContext.currentUri(), plain.length(), preview);
             }
             return new DecryptedHttpInputMessage(inputMessage.getHeaders(),
                     plain.getBytes(StandardCharsets.UTF_8));

@@ -29,6 +29,8 @@ spring:
       discovery:
         server-addr: ${NACOS_ADDR:127.0.0.1:8848}
         namespace: ${NACOS_NAMESPACE:public}
+        ip: ${NACOS_IP:192.168.115.164}
+        prefer-ip-address: true
 
 mybatis-plus:
   mapper-locations: classpath*:mapper/**/*.xml
@@ -74,6 +76,31 @@ big:
   web:
     # CORS 由网关统一处理，下游不能再加，否则 Access-Control-Allow-Origin 重复
     cors-enabled: false
+  auth:
+    security:
+      # 连续登录失败次数上限，达到后锁定账号
+      max-fail-count: 5
+      # 账号锁定时长（分钟）
+      lock-minutes: 10
+      # 同一 IP 登录失败次数上限（窗口内拒绝该 IP 登录，不锁定具体账号）
+      max-ip-fail-count: 20
+      # IP 维度失败计数窗口（分钟）
+      ip-fail-window-minutes: 10
+      # 同一 IP 每分钟验证码请求上限
+      max-captcha-per-minute: 30
+  encrypt:
+    enabled: ${BIG_ENCRYPT_ENABLED:true}
+    interceptor-enabled: true
+    replay-check: ${BIG_ENCRYPT_REPLAY_CHECK:true}
+    sm4:
+      default-key-id: ${SM4_DEFAULT_KEY_ID:v1}
+      keys:
+        v1: ${SM4_KEY_V1:ZGV2LXNtNC1kZXYta2V5IQ==}
+    sm2:
+      public-key: ${SM2_PUBLIC_KEY:}
+      private-key: ${SM2_PRIVATE_KEY:}
+    sm3:
+      mac-key: ${SM3_MAC_KEY:}
 
 logging:
   file:
