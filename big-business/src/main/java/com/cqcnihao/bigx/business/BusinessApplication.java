@@ -10,7 +10,7 @@ import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
         "com.cqcnihao.bigx.common",
         "com.cqcnihao.bigx.encrypt"
 })
-@MapperScan("com.cqcnihao.bigx.business.mapper")
+@MapperScan({"com.cqcnihao.bigx.business.mapper", "com.cqcnihao.bigx.license.mapper"})
 @EnableDiscoveryClient
 public class BusinessApplication {
     public static void main(String[] args) {

@@ -39,6 +39,7 @@
         <commons-pool2.version>2.12.0</commons-pool2.version> <!-- Redis连接池 -->
         <resilience4j.version>5.0.1</resilience4j.version> <!-- CircuitBreaker -->
         <bcprov.version>1.78.1</bcprov.version> <!-- 国密算法底座 SM2/SM3/SM4（big-Encrypt / ZYweb 统一） -->
+        <truelicense.version>1.33</truelicense.version> <!-- TrueLicense 软件许可证（big-license） -->
   </properties>
 
 <dependencyManagement>
@@ -99,6 +100,13 @@
       <artifactId>sqlite-jdbc</artifactId>
       <version>3.45.2.0</version>
       <scope>runtime</scope>
+    </dependency>
+
+    <!-- TrueLicense 软件许可证校验（V1，XMLEncoder 持久化，无 JAXB 依赖） -->
+    <dependency>
+        <groupId>de.schlichtherle.truelicense</groupId>
+        <artifactId>truelicense-core</artifactId>
+        <version>${truelicense.version}</version>
     </dependency>
 
     <!-- MyBatis Plus -->
@@ -541,6 +549,18 @@
           <artifactId>bcprov-jdk18on</artifactId>
           <version>${bcprov.version}</version>
       </dependency>
+      <!-- BouncyCastle PKIX：X509 证书构建（big-license 签发工具） -->
+      <dependency>
+          <groupId>org.bouncycastle</groupId>
+          <artifactId>bcpkix-jdk18on</artifactId>
+          <version>${bcprov.version}</version>
+      </dependency>
+      <!-- BouncyCastle Util：必须锁到与 bcprov 同版本，否则 Spring Boot BOM 会带入 1.85 导致 NoSuchFieldError -->
+      <dependency>
+          <groupId>org.bouncycastle</groupId>
+          <artifactId>bcutil-jdk18on</artifactId>
+          <version>${bcprov.version}</version>
+      </dependency>
 
   </dependencies>
 </dependencyManagement>
@@ -551,6 +571,7 @@
         <module>big-utils</module>
         <module>big-web-common</module>
         <module>big-encrypt</module>
+        <module>big-license</module>
         <module>big-gateway</module>
         <module>big-auth</module>
         <module>big-business</module>

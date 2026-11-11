@@ -24,3 +24,11 @@ export function updateProduct(data) {
 export function deleteProduct(id) {
   return request.delete('/api/product/' + id)
 }
+
+export function confirmProduct(id) {
+  return request.post('/api/product/' + id + '/confirm')
+}
+
+export function cancelProduct(id) {
+  return request.post('/api/product/' + id + '/cancel')
+}

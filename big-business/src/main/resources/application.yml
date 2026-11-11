@@ -23,7 +23,7 @@ spring:
       discovery:
         server-addr: ${NACOS_ADDR:127.0.0.1:8848}
         namespace: ${NACOS_NAMESPACE:public}
-        ip: ${NACOS_IP:192.168.115.164}
+        ip: ${NACOS_IP:127.0.0.1}
         prefer-ip-address: true
 
 mybatis-plus:
@@ -58,6 +58,21 @@ big:
   web:
     # CORS 由网关统一处理，下游不能再加，否则 Access-Control-Allow-Origin 重复
     cors-enabled: false
+
+  # 软件许可证（TrueLicense）：默认关闭（开发零感知）；
+  # 生产 BIG_LICENSE_ENABLED=true + BIG_LICENSE_STORE_PWD 开启，部署目录需含 ./license/license.lic 与 ./license/publicCerts.store
+  license:
+    enabled: ${BIG_LICENSE_ENABLED:true}
+    subject: ${BIG_LICENSE_SUBJECT:bigx}
+    license-path: ${BIG_LICENSE_PATH:./license/license.lic}
+    public-certs-path: ${BIG_LICENSE_PUB_STORE:./license/publicCerts.store}
+    private-store-path: ${BIG_LICENSE_PRIVATE_STORE:./license/privateKeys.store}
+    store-pwd: ${BIG_LICENSE_STORE_PWD:bigx-store-pwd-2024}
+    key-pwd: ${BIG_LICENSE_KEY_PWD:bigx-store-pwd-2024}
+    private-alias: ${BIG_LICENSE_PRIVATE_ALIAS:privateKey}
+    verify-interval-minutes: ${BIG_LICENSE_VERIFY_INTERVAL:30}
+    on-fail: ${BIG_LICENSE_ON_FAIL:exit}
+    clock-rollback-check: ${BIG_LICENSE_CLOCK_CHECK:true}
 
   encrypt:
     # 加密全局化试点第一步：默认开启（ANNOTATION 模式，仅标注 @SmEncrypt 的接口生效）

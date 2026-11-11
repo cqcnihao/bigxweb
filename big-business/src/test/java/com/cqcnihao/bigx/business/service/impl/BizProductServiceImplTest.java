@@ -17,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
+import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -54,7 +55,7 @@ class BizProductServiceImplTest {
     @BeforeEach
     void setUp() {
         mapper = mock(BizProductMapper.class);
-        service = new BizProductServiceImpl(mapper);
+        service = new BizProductServiceImpl(mapper, new ObjectMapper());
     }
 
     // ------------------------------------------------------------------
@@ -79,6 +80,8 @@ class BizProductServiceImplTest {
             assertEquals("描述", created.getDescription());
             assertEquals(42L, created.getCreateBy(), "登录用户应写入 createBy");
             assertEquals(0, created.getDeleted(), "逻辑删除标记应初始化为 0");
+            assertEquals(BizProduct.STATUS_DRAFT_CREATE, created.getStatus(),
+                    "两步确认：新增第一步应落草稿（status=0）");
             assertNotNull(created.getCreateTime());
             assertNotNull(created.getUpdateTime());
 
@@ -117,13 +120,15 @@ class BizProductServiceImplTest {
     }
 
     // ------------------------------------------------------------------
-    // 更新
+    // 更新（两步确认：生效记录写快照；草稿直接改字段）
     // ------------------------------------------------------------------
 
     @Test
-    void update_shouldCopyDtoAndSetUpdateTime() {
+    void update_onActiveRecord_shouldWritePendingSnapshotWithoutTouchingOfficialFields() {
         BizProduct exist = product(1L, "旧商品");
-        LocalDateTime oldUpdateTime = exist.getUpdateTime();
+        exist.setStatus(BizProduct.STATUS_ACTIVE);
+        String oldName = exist.getProductName();
+        BigDecimal oldPrice = exist.getPrice();
         when(mapper.selectById(1L)).thenReturn(exist);
         when(mapper.updateById(any(BizProduct.class))).thenReturn(1);
 
@@ -132,13 +137,31 @@ class BizProductServiceImplTest {
 
         BizProduct updated = service.update(dto);
 
-        assertSame(exist, updated, "更新应作用于已存在的实体");
-        assertEquals(1L, updated.getId());
-        assertEquals("新商品", updated.getProductName());
-        assertEquals("P-002", updated.getProductCode());
-        assertEquals(0, new BigDecimal("20.00").compareTo(updated.getPrice()));
-        assertEquals(8, updated.getStock());
-        assertTrue(updated.getUpdateTime().isAfter(oldUpdateTime), "updateTime 应刷新");
+        assertSame(exist, updated);
+        assertEquals(BizProduct.STATUS_PENDING_UPDATE, updated.getStatus(),
+                "生效记录提交修改后应进入修改待确认状态");
+        assertEquals(oldName, updated.getProductName(), "正式字段不应被改动");
+        assertEquals(0, oldPrice.compareTo(updated.getPrice()), "正式价格不应被改动");
+        assertNotNull(updated.getPendingData(), "应写入变更快照");
+        assertTrue(updated.getPendingData().contains("新商品"), "快照应包含新值");
+        verify(mapper).updateById(exist);
+    }
+
+    @Test
+    void update_onDraftRecord_shouldCopyFieldsDirectly() {
+        BizProduct exist = product(1L, "草稿商品");
+        exist.setStatus(BizProduct.STATUS_DRAFT_CREATE);
+        when(mapper.selectById(1L)).thenReturn(exist);
+        when(mapper.updateById(any(BizProduct.class))).thenReturn(1);
+
+        ProductDTO dto = dto("新商品", "P-002", "20.00", 8);
+        dto.setId(1L);
+
+        BizProduct updated = service.update(dto);
+
+        assertEquals(BizProduct.STATUS_DRAFT_CREATE, updated.getStatus(), "草稿应保持待确认状态");
+        assertEquals("新商品", updated.getProductName(), "草稿可直接更新字段");
+        assertNull(updated.getPendingData(), "草稿无需快照");
         verify(mapper).updateById(exist);
     }
 
@@ -167,11 +190,108 @@ class BizProductServiceImplTest {
     }
 
     // ------------------------------------------------------------------
+    // 确认与取消（第二步）
+    // ------------------------------------------------------------------
+
+    @Test
+    void confirm_shouldActivateDraftRecord() {
+        BizProduct draft = product(1L, "草稿商品");
+        draft.setStatus(BizProduct.STATUS_DRAFT_CREATE);
+        when(mapper.selectById(1L)).thenReturn(draft);
+        when(mapper.updateById(any(BizProduct.class))).thenReturn(1);
+
+        BizProduct confirmed = service.confirm(1L);
+
+        assertEquals(BizProduct.STATUS_ACTIVE, confirmed.getStatus(), "确认新增后应生效");
+        verify(mapper).updateById(draft);
+    }
+
+    @Test
+    void confirm_shouldApplyPendingSnapshotAndClearIt() {
+        BizProduct pending = product(1L, "旧商品");
+        pending.setStatus(BizProduct.STATUS_PENDING_UPDATE);
+        ProductDTO change = dto("新商品", "P-002", "20.00", 8);
+        pending.setPendingData(new ObjectMapper().writeValueAsString(change));
+        when(mapper.selectById(1L)).thenReturn(pending);
+        when(mapper.updateById(any(BizProduct.class))).thenReturn(1);
+
+        BizProduct confirmed = service.confirm(1L);
+
+        assertEquals(BizProduct.STATUS_ACTIVE, confirmed.getStatus());
+        assertEquals("新商品", confirmed.getProductName(), "确认后应应用快照中的新值");
+        assertEquals(0, new BigDecimal("20.00").compareTo(confirmed.getPrice()));
+        assertNull(confirmed.getPendingData(), "确认后快照应清空");
+        verify(mapper).updateById(pending);
+    }
+
+    @Test
+    void confirm_shouldRejectAlreadyActiveRecord() {
+        BizProduct active = product(1L, "已生效商品");
+        active.setStatus(BizProduct.STATUS_ACTIVE);
+        when(mapper.selectById(1L)).thenReturn(active);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.confirm(1L));
+
+        assertEquals("400", ex.getCode());
+        verify(mapper, never()).updateById(any(BizProduct.class));
+    }
+
+    @Test
+    void confirm_shouldThrowNotFoundWhenMissing() {
+        when(mapper.selectById(99L)).thenReturn(null);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.confirm(99L));
+
+        assertEquals("404", ex.getCode());
+    }
+
+    @Test
+    void cancel_shouldDeleteDraftRecord() {
+        BizProduct draft = product(1L, "草稿商品");
+        draft.setStatus(BizProduct.STATUS_DRAFT_CREATE);
+        when(mapper.selectById(1L)).thenReturn(draft);
+        when(mapper.deleteById(1L)).thenReturn(1);
+
+        assertDoesNotThrow(() -> service.cancel(1L));
+
+        verify(mapper).deleteById(1L);
+    }
+
+    @Test
+    void cancel_shouldDiscardPendingSnapshotAndRestoreActive() {
+        BizProduct pending = product(1L, "旧商品");
+        pending.setStatus(BizProduct.STATUS_PENDING_UPDATE);
+        pending.setPendingData("{\"productName\":\"新商品\"}");
+        when(mapper.selectById(1L)).thenReturn(pending);
+        when(mapper.updateById(any(BizProduct.class))).thenReturn(1);
+
+        assertDoesNotThrow(() -> service.cancel(1L));
+
+        assertEquals(BizProduct.STATUS_ACTIVE, pending.getStatus());
+        assertEquals("旧商品", pending.getProductName(), "取消后正式数据不变");
+        assertNull(pending.getPendingData());
+        verify(mapper).updateById(pending);
+    }
+
+    @Test
+    void cancel_shouldRejectActiveRecord() {
+        BizProduct active = product(1L, "已生效商品");
+        active.setStatus(BizProduct.STATUS_ACTIVE);
+        when(mapper.selectById(1L)).thenReturn(active);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.cancel(1L));
+
+        assertEquals("400", ex.getCode());
+    }
+
+    // ------------------------------------------------------------------
     // 删除
     // ------------------------------------------------------------------
 
     @Test
     void delete_shouldDelegateToBaseMapper() {
+        // removeById 会先 selectById 校验存在，再执行 deleteById 逻辑删除
+        when(mapper.selectById(1L)).thenReturn(product(1L, "商品A"));
         when(mapper.deleteById(1L)).thenReturn(1);
 
         assertDoesNotThrow(() -> service.delete(1L));
@@ -204,7 +324,7 @@ class BizProductServiceImplTest {
             return page;
         });
 
-        IPage<BizProduct> result = service.page(2, 3, "商品");
+        IPage<BizProduct> result = service.page(2, 3, "商品", null);
 
         assertEquals(2, result.getCurrent(), "分页页码应透传");
         assertEquals(3, result.getSize(), "分页大小应透传");
@@ -215,7 +335,7 @@ class BizProductServiceImplTest {
         String sql = wrapper.getSqlSegment();
         assertTrue(sql.contains("product_name"), "关键字应参与商品名称模糊匹配：" + sql);
         assertTrue(sql.contains("product_code"), "关键字应参与商品编码模糊匹配：" + sql);
-        assertTrue(sql.contains("create_time"), "默认应按创建时间倒序：" + sql);
+        assertTrue(sql.contains("update_time"), "默认应按更新时间倒序：" + sql);
         assertEquals(2, wrapper.getParamNameValuePairs().size(), "两个 like 条件应各带一个参数");
     }
 
@@ -230,7 +350,7 @@ class BizProductServiceImplTest {
             return page;
         });
 
-        service.page(1, 10, "   ");
+        service.page(1, 10, "   ", null);
 
         LambdaQueryWrapper<BizProduct> wrapper = (LambdaQueryWrapper<BizProduct>) wrapperRef.get();
         String sql = wrapper.getSqlSegment();
@@ -296,6 +416,7 @@ class BizProductServiceImplTest {
         product.setStock(5);
         product.setCategory("电子");
         product.setDescription("描述");
+        product.setStatus(BizProduct.STATUS_ACTIVE);
         product.setCreateTime(LocalDateTime.now().minusDays(1));
         product.setUpdateTime(LocalDateTime.now().minusDays(1));
         product.setDeleted(0);

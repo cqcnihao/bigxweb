@@ -28,13 +28,14 @@ public class BizProductController extends BaseController {
 
     private final BizProductService productService;
 
-    @Operation(summary = "分页查询商品")
+    @Operation(summary = "分页查询商品", description = "status: 0=新增待确认，1=已生效，2=修改待确认")
     @GetMapping("/page")
     public Result<IPage<BizProduct>> page(
             @RequestParam(defaultValue = "1") long current,
             @RequestParam(defaultValue = "10") long size,
-            @RequestParam(required = false) String keyword) {
-        return Result.success(productService.page(current, size, keyword));
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Integer status) {
+        return Result.success(productService.page(current, size, keyword, status));
     }
 
     @Operation(summary = "根据 ID 查询商品")
@@ -43,16 +44,29 @@ public class BizProductController extends BaseController {
         return Result.success(productService.getById(id));
     }
 
-    @Operation(summary = "新增商品")
+    @Operation(summary = "新增商品（第一步：落草稿，待确认）")
     @PostMapping
     public Result<BizProduct> create(@Valid @RequestBody ProductDTO dto) {
         return Result.success(productService.create(dto));
     }
 
-    @Operation(summary = "更新商品")
+    @Operation(summary = "提交修改（第一步：生效记录写待确认快照）")
     @PutMapping
     public Result<BizProduct> update(@Valid @RequestBody ProductDTO dto) {
         return Result.success(productService.update(dto));
+    }
+
+    @Operation(summary = "确认（第二步：确认新增 / 确认修改）")
+    @PostMapping("/{id}/confirm")
+    public Result<BizProduct> confirm(@PathVariable Long id) {
+        return Result.success(productService.confirm(id));
+    }
+
+    @Operation(summary = "取消待确认（草稿删除 / 丢弃修改快照）")
+    @PostMapping("/{id}/cancel")
+    public Result<Void> cancel(@PathVariable Long id) {
+        productService.cancel(id);
+        return Result.success();
     }
 
     @Operation(summary = "删除商品")

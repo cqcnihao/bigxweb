@@ -41,6 +41,13 @@
             <version>${big.project.version}</version>
         </dependency>
 
+        <!-- 软件许可证校验（big.license.enabled=false 时不装配，默认关闭） -->
+        <dependency>
+            <groupId>com.cqcnihao.bigx</groupId>
+            <artifactId>big-license</artifactId>
+            <version>${big.project.version}</version>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>

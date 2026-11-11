@@ -24,6 +24,18 @@ const routes = [
         name: 'Product',
         component: () => import('@/views/ProductList.vue'),
         meta: { title: '产品管理', icon: 'Goods' }
+      },
+      {
+        path: 'order',
+        name: 'Order',
+        component: () => import('@/views/OrderList.vue'),
+        meta: { title: '订单管理', icon: 'Tickets' }
+      },
+      {
+        path: 'invoice',
+        name: 'Invoice',
+        component: () => import('@/views/InvoiceList.vue'),
+        meta: { title: '发票管理', icon: 'Document' }
       }
     ]
   },

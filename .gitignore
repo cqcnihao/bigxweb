@@ -20,4 +20,9 @@ dump.rdb
 # 本地环境配置（含密钥，禁止入库）
 .env
 application-local.yml
+
+# 许可证资产（私钥库/公钥库/许可证文件/时钟状态，禁止入库）
+license/
+*.lic
+*.store
 /下游验证测试报告.md

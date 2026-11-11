@@ -16,16 +16,19 @@ export default defineConfig(({ mode }) => {
       open: true,
       proxy: {
         '/auth': {
-          target: env.VITE_GATEWAY_URL || 'http://localhost:8080',
-          changeOrigin: true
+          target: env.VITE_GATEWAY_URL || 'https://localhost:8443',
+          changeOrigin: true,
+          secure: false
         },
         '/crypto': {
-          target: env.VITE_GATEWAY_URL || 'http://localhost:8080',
-          changeOrigin: true
+          target: env.VITE_GATEWAY_URL || 'https://localhost:8443',
+          changeOrigin: true,
+          secure: false
         },
         '/api': {
-          target: env.VITE_GATEWAY_URL || 'http://localhost:8080',
-          changeOrigin: true
+          target: env.VITE_GATEWAY_URL || 'https://localhost:8443',
+          changeOrigin: true,
+          secure: false
         }
       }
     }
