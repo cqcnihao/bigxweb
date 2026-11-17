@@ -74,6 +74,10 @@ class Sm2KeyEndpointGlobalModeTest {
         registry.add("big.encrypt.sm4.keys[v1]", () -> SM4_KEY);
         registry.add("big.encrypt.sm4.mac-enabled", () -> "true");
         registry.add("big.encrypt.sm2.public-key", () -> SM2_KP[0]);
+        // 验签默认开启（严格模式），全局模式下请求也必须带 SM2 签名
+        registry.add("big.encrypt.sm2.private-key", () -> SM2_KP[1]);
+        // 公钥端点默认关闭（生产安全默认），测试显式开启
+        registry.add("big.encrypt.sm2.expose-key-endpoint", () -> "true");
     }
 
     @Test
@@ -102,13 +106,17 @@ class Sm2KeyEndpointGlobalModeTest {
     void normalEndpoint_shouldBeEncryptedInGlobalMode() throws Exception {
         // 全局模式下请求体也必须是密文信封
         EncryptedPayload env = cryptoService.encrypt("{\"m\":\"1\"}", null, null);
+        long ts = System.currentTimeMillis();
+        String nonce = UUID.randomUUID().toString();
+        String sign = cryptoService.sign(cryptoService.signPayload(ts, nonce, env.getCipher()));
         String body = objectMapper.writeValueAsString(Map.of(
                 "alg", env.getAlg(),
                 "keyId", env.getKeyId(),
                 "cipher", env.getCipher(),
                 "mac", env.getMac(),
-                "timestamp", System.currentTimeMillis(),
-                "nonce", UUID.randomUUID().toString()));
+                "sign", sign,
+                "timestamp", ts,
+                "nonce", nonce));
 
         MvcResult result = mockMvc.perform(post("/gm/echo")
                         .contentType(MediaType.APPLICATION_JSON)

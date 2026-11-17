@@ -73,6 +73,12 @@ public class GatewayValidationProperties {
         loginExcludePaths.add("/auth/captcha");
         loginExcludePaths.add("/auth/public-key");
         loginExcludePaths.add("/crypto/sm2/public-key");
+        // 客户端 SM2 公钥登记：首次登记必然发生在登录态之前（浏览器本地还没有密钥），
+        // 若不排除，客户端将永远无法完成登记，严格验签会拒绝所有加密请求。
+        loginExcludePaths.add("/crypto/sm2/client-key");
+        // AJ-Captcha 行为验证码：登录前交互，必须匿名可达
+        loginExcludePaths.add("/auth/captcha/get");
+        loginExcludePaths.add("/auth/captcha/check");
         loginExcludePaths.add("/actuator/health");
         loginExcludePaths.add("/error");
         loginExcludePaths.add("/favicon.ico");

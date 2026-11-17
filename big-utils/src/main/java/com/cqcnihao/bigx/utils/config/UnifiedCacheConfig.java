@@ -289,6 +289,9 @@ public class UnifiedCacheConfig {
     /**
      * 创建 JSON 序列化器
      * 支持复杂对象的序列化/反序列化
+     * <p>
+     * 多态类型白名单收紧：仅允许本项目包与常见 JDK 集合类型携带 {@code @class} 信息，
+     * 避免 Redis 数据被污染时反序列化任意类（gadget chain 风险）。
      */
     private GenericJacksonJsonRedisSerializer createJsonSerializer() {
         tools.jackson.databind.ObjectMapper objectMapper = 
@@ -297,6 +300,10 @@ public class UnifiedCacheConfig {
                 .changeDefaultVisibility(vc -> vc.withVisibility(com.fasterxml.jackson.annotation.PropertyAccessor.ALL, com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility.ANY))
                 .activateDefaultTyping(
                     tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator.builder()
+                        .allowIfSubType("com.cqcnihao.bigx.")
+                        .allowIfSubType("java.util.")
+                        .allowIfSubType("java.time.")
+                        .allowIfSubType("java.lang.")
                         .allowIfSubTypeIsArray()
                         .build(),
                     tools.jackson.databind.DefaultTyping.NON_FINAL

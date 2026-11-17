@@ -32,7 +32,7 @@ public class BaseController {
         Map<String, Object> data = new HashMap<>();
         data.put("status", "UP");
         data.put("timestamp", LocalDateTime.now().toString());
-        data.put("service", "bigweb");
+        data.put("service", "bigxweb");
         return Result.success(data);
     }
 
@@ -43,8 +43,8 @@ public class BaseController {
     @GetMapping("/info")
     public Result<Map<String, Object>> info() {
         Map<String, Object> data = new HashMap<>();
-        data.put("name", "Bigweb Service");
-        data.put("version", "1.3.5-SNAPSHOT");
+        data.put("name", "Bigxweb Service");
+        data.put("version", "1.4.8-SNAPSHOT");
         data.put("javaVersion", System.getProperty("java.version"));
         data.put("timestamp", LocalDateTime.now().toString());
         return Result.success(data);

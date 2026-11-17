@@ -122,7 +122,9 @@ public class SmDecryptRequestBodyAdvice implements RequestBodyAdvice {
                     throw new CryptoException(CryptoException.CODE_SIGN_INVALID, "缺少签名值");
                 }
                 String payload = cryptoService.signPayload(timestamp, nonce, envelope.getCipher());
-                if (!cryptoService.verify(payload, sign)) {
+                String clientKeyId = firstNonBlank(envelope.getClientKeyId(),
+                        header(request, EncryptContext.HEADER_CLIENT_KEY_ID));
+                if (!cryptoService.verify(payload, sign, clientKeyId)) {
                     throw new CryptoException(CryptoException.CODE_SIGN_INVALID, "SM2 签名校验失败");
                 }
             }

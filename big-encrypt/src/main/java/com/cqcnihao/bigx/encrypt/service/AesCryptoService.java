@@ -4,6 +4,7 @@ import com.cqcnihao.bigx.common.crypto.AesCryptoUtil;
 import com.cqcnihao.bigx.encrypt.config.EncryptProperties;
 import com.cqcnihao.bigx.encrypt.envelope.EncryptedPayload;
 import com.cqcnihao.bigx.encrypt.exception.CryptoException;
+import com.cqcnihao.bigx.encrypt.support.ClientKeyStore;
 import com.cqcnihao.bigx.encrypt.support.ReplayGuard;
 
 import java.util.Base64;
@@ -27,6 +28,12 @@ public class AesCryptoService extends SmCryptoService {
 
     public AesCryptoService(EncryptProperties properties, ReplayGuard replayGuard) {
         super(properties, replayGuard);
+        this.properties = properties;
+    }
+
+    public AesCryptoService(EncryptProperties properties, ReplayGuard replayGuard,
+                            ClientKeyStore clientKeyStore) {
+        super(properties, replayGuard, clientKeyStore);
         this.properties = properties;
     }
 

@@ -44,6 +44,9 @@ public class EncryptedRequest implements Serializable {
     /** Base64(SM2 签名) */
     private String sign;
 
+    /** 客户端密钥标识（服务端登记时签发），为空则用服务端全局公钥验签 */
+    private String clientKeyId;
+
     /** 客户端时间戳（毫秒） */
     private Long timestamp;
 

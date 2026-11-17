@@ -139,14 +139,41 @@ public class EncryptProperties {
         private String privateKey;
         /** 密文排列：C1C3C2（新国标）或 C1C2C3 */
         private String mode = "C1C3C2";
-        /** 是否强制校验请求签名 */
-        private boolean verifySignature = false;
+        /**
+         * 是否强制校验请求签名（默认开启，且为严格模式）
+         * <p>
+         * 开启后，加密信封<b>必须</b>携带 {@code sign}（或请求头 {@code X-Sign}），
+         * 缺失或校验失败一律抛 {@code CODE_SIGN_INVALID}。签名依赖
+         * {@code big.encrypt.sm2.public-key} 才能验，未配置公钥时所有加密请求都会被拒绝，
+         * 因此启动期会做守卫：prod 环境缺公钥直接拒绝启动，其他环境打印 ERROR 强提醒。
+         * <p>
+         * 仅当确有无法签名的调用方（如纯浏览器前端且未下发私钥场景）需要放开时，
+         * 才显式配置 {@code big.encrypt.sm2.verify-signature=false}。
+         */
+        private boolean verifySignature = true;
         /** 公钥版本号，随公钥一起下发给客户端，便于密钥轮换 */
         private String keyId = "v1";
-        /** 是否暴露 SM2 公钥下发端点（混合加密握手第一步），关闭后置为 false */
-        private boolean exposeKeyEndpoint = true;
+        /** 是否暴露 SM2 公钥下发端点（混合加密握手第一步）；默认关闭，按需显式开启 */
+        private boolean exposeKeyEndpoint = false;
         /** 公钥下发端点路径 */
         private String keyEndpointPath = "/crypto/sm2/public-key";
+        /**
+         * 是否允许客户端登记自己的 SM2 公钥（客户端密钥体系）
+         * <p>
+         * 浏览器无法持有服务端私钥，若要求「必须携带签名」，就必须让客户端自己生成
+         * SM2 密钥对、把<b>公钥</b>登记到服务端，请求时用本地私钥签名、服务端按
+         * {@code clientKeyId} 取对应公钥验签。开启后 {@link #verifySignature} 才能真正落地。
+         * <p>
+         * 注意：登记公钥只证明「请求方持有该私钥」，不等同于身份认证；
+         * 身份仍由 Sa-Token 登录态承担，两者互补。
+         */
+        private boolean clientKeyEnabled = true;
+        /** 客户端公钥登记端点路径 */
+        private String clientKeyEndpointPath = "/crypto/sm2/client-key";
+        /** 客户端公钥登记有效期（秒），默认 24 小时，过期需重新登记 */
+        private long clientKeyTtlSeconds = 86400L;
+        /** 单个客户端公钥最大长度（Base64 字符数），防止超大 payload 撑爆存储 */
+        private int clientKeyMaxLength = 512;
     }
 
     /** SM3 配置 */

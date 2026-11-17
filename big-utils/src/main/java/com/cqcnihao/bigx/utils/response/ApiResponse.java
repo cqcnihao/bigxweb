@@ -1,4 +1,4 @@
-package com.cqcnihao.bigx.common.response;
+package com.cqcnihao.bigx.utils.response;
 
 import com.cqcnihao.bigx.common.IResult;
 import com.cqcnihao.bigx.common.ResultCode;

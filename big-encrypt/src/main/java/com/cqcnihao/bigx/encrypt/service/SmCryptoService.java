@@ -7,10 +7,13 @@ import com.cqcnihao.bigx.encrypt.core.Sm3;
 import com.cqcnihao.bigx.encrypt.core.Sm4;
 import com.cqcnihao.bigx.encrypt.envelope.EncryptedPayload;
 import com.cqcnihao.bigx.encrypt.exception.CryptoException;
+import com.cqcnihao.bigx.encrypt.support.ClientKeyStore;
 import com.cqcnihao.bigx.encrypt.support.ReplayGuard;
 
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.HexFormat;
 import java.util.Map;
 
 /**
@@ -32,10 +35,17 @@ public class SmCryptoService implements MessageCryptoService {
 
     private final EncryptProperties properties;
     private final ReplayGuard replayGuard;
+    private final ClientKeyStore clientKeyStore;
 
     public SmCryptoService(EncryptProperties properties, ReplayGuard replayGuard) {
+        this(properties, replayGuard, null);
+    }
+
+    public SmCryptoService(EncryptProperties properties, ReplayGuard replayGuard,
+                           ClientKeyStore clientKeyStore) {
         this.properties = properties;
         this.replayGuard = replayGuard;
+        this.clientKeyStore = clientKeyStore;
     }
 
     // ==================== 响应加密 ====================
@@ -130,6 +140,91 @@ public class SmCryptoService implements MessageCryptoService {
         }
         return Sm2.verify(raw.getBytes(StandardCharsets.UTF_8), signBase64, publicKey);
     }
+
+    /**
+     * 按客户端登记的密钥验签
+     * <p>
+     * 严格验签语义下，{@code clientKeyId} 缺失或对应公钥不存在都直接返回 false，
+     * 由调用方统一抛 {@code CODE_SIGN_INVALID}，绝不做「找不到公钥就放行」的降级。
+     * 未提供 {@code clientKeyId} 时才回退到服务端全局公钥，兼容服务端到服务端调用。
+     */
+    @Override
+    public boolean verify(String raw, String signBase64, String clientKeyId) {
+        if (signBase64 == null || signBase64.isBlank()) {
+            return false;
+        }
+        if (clientKeyId == null || clientKeyId.isBlank()) {
+            return verify(raw, signBase64);
+        }
+        String publicKey = resolveClientPublicKey(clientKeyId);
+        if (publicKey == null || publicKey.isBlank()) {
+            return false;
+        }
+        return Sm2.verify(raw.getBytes(StandardCharsets.UTF_8), signBase64, publicKey);
+    }
+
+    /**
+     * 查询客户端公钥（已归一化为 X.509 Base64）
+     */
+    public String resolveClientPublicKey(String clientKeyId) {
+        return clientKeyStore == null ? null : clientKeyStore.find(clientKeyId);
+    }
+
+    // ==================== 客户端密钥登记 ====================
+
+    /**
+     * 登记客户端 SM2 公钥
+     * <p>
+     * {@code clientKeyId} 由服务端随机生成后返回，<b>不接受客户端指定</b>：
+     * 否则攻击者可把 id 设成他人的标识，用自己的私钥签名冒充对方。
+     * 浏览器国密库产出的是裸公钥点（04||X||Y 的 hex），这里统一归一化成 X.509。
+     *
+     * @param rawPublicKey 客户端公钥：裸公钥点 hex，或已编码的 X.509 Base64
+     * @return 服务端签发的 {@code clientKeyId}
+     */
+    public String registerClientKey(String rawPublicKey) {
+        EncryptProperties.Sm2Config sm2 = properties.getSm2();
+        if (!sm2.isClientKeyEnabled()) {
+            throw new CryptoException(CryptoException.CODE_CONFIG, "客户端密钥登记已关闭（big.encrypt.sm2.client-key-enabled=false）");
+        }
+        if (clientKeyStore == null) {
+            throw new CryptoException(CryptoException.CODE_CONFIG, "客户端密钥存储未初始化");
+        }
+        if (rawPublicKey == null || rawPublicKey.isBlank()) {
+            throw new CryptoException(CryptoException.CODE_KEY_MISSING, "客户端公钥不能为空");
+        }
+        if (rawPublicKey.length() > sm2.getClientKeyMaxLength()) {
+            throw new CryptoException(CryptoException.CODE_KEY_MISSING,
+                    "客户端公钥长度超出上限 " + sm2.getClientKeyMaxLength());
+        }
+        String publicKey = Sm2.normalizeClientPublicKey(rawPublicKey);
+        String clientKeyId = newClientKeyId();
+        clientKeyStore.save(clientKeyId, publicKey, sm2.getClientKeyTtlSeconds());
+        return clientKeyId;
+    }
+
+    /**
+     * 注销客户端公钥（客户端登出 / 更换设备时调用）
+     */
+    public void revokeClientKey(String clientKeyId) {
+        if (clientKeyStore != null) {
+            clientKeyStore.remove(clientKeyId);
+        }
+    }
+
+    /**
+     * 客户端公钥有效期（秒），供客户端在过期前主动续期
+     */
+    public long getClientKeyTtlSeconds() {
+        return properties.getSm2().getClientKeyTtlSeconds();
+    }
+
+    private static String newClientKeyId() {
+        byte[] bytes = new byte[16];
+        new SecureRandom().nextBytes(bytes);
+        return HexFormat.of().formatHex(bytes);
+    }
+
 
     // ==================== 新鲜性 / 防重放 ====================
 

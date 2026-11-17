@@ -7,6 +7,7 @@ import com.cqcnihao.bigx.business.entity.BizProduct;
 import com.cqcnihao.bigx.business.service.BizProductService;
 import com.cqcnihao.bigx.common.Result;
 import com.cqcnihao.bigx.encrypt.annotation.SmEncrypt;
+import com.cqcnihao.bigx.web.common.annotation.OperationLog;
 import com.cqcnihao.bigx.web.common.controller.BaseController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,6 +31,7 @@ public class BizProductController extends BaseController {
 
     @Operation(summary = "分页查询商品", description = "status: 0=新增待确认，1=已生效，2=修改待确认")
     @GetMapping("/page")
+    @OperationLog(module = "分页查询商品", operationType = "query", description = "分页查询商品（status: 0=新增待确认，1=已生效，2=修改待确认）)")
     public Result<IPage<BizProduct>> page(
             @RequestParam(defaultValue = "1") long current,
             @RequestParam(defaultValue = "10") long size,

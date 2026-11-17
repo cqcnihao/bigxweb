@@ -31,15 +31,19 @@ public class SaTokenAuthGlobalFilter implements GlobalFilter, Ordered {
     private static final Set<String> WHITE_EXACT = Set.of(
             "/auth/login",
             "/auth/captcha",
+            "/auth/captcha/get",
+            "/auth/captcha/check",
             "/auth/public-key",
             "/crypto/sm2/public-key",
+            "/crypto/sm2/client-key",
             "/doc.html",
             "/favicon.ico",
             "/actuator/health",
             "/big-auth/auth/login",
             "/big-auth/auth/captcha",
             "/big-auth/auth/public-key",
-            "/big-auth/crypto/sm2/public-key"
+            "/big-auth/crypto/sm2/public-key",
+            "/big-auth/crypto/sm2/client-key"
     );
 
     /** 前缀白名单，仅用于明确的路径族 */

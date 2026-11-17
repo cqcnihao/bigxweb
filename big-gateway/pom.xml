@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.cqcnihao.bigx</groupId>
         <artifactId>root</artifactId>
-        <version>1.4.7-SNAPSHOT</version>
+        <version>1.4.8-SNAPSHOT</version>
     </parent>
 
     <artifactId>big-gateway</artifactId>
@@ -55,7 +55,7 @@
         <dependency>
             <groupId>com.cqcnihao.bigx</groupId>
             <artifactId>big-common</artifactId>
-            <version>${big.project.version}</version>
+            <version>${bigx.project.version}</version>
             <exclusions>
                 <!-- WebFlux 下只能有 reactor 版 SaTokenContext，排除 servlet 版防止 Bean 冲突 -->
                 <exclusion>
@@ -73,7 +73,7 @@
         <dependency>
             <groupId>com.cqcnihao.bigx</groupId>
             <artifactId>big-license</artifactId>
-            <version>${big.project.version}</version>
+            <version>${bigx.project.version}</version>
         </dependency>
 
         <dependency>

@@ -40,8 +40,20 @@ public interface MessageCryptoService {
     /** SM2 私钥签名 */
     String sign(String raw);
 
-    /** SM2 公钥验签 */
+    /** SM2 公钥验签（使用服务端全局公钥） */
     boolean verify(String raw, String signBase64);
+
+    /**
+     * SM2 公钥验签（按客户端登记的密钥验签）
+     * <p>
+     * 浏览器无法持有服务端私钥，客户端本地生成密钥对后把公钥登记到服务端，
+     * 请求时带上 {@code clientKeyId}，服务端据此取公钥验签。
+     *
+     * @param raw         待验签原文
+     * @param signBase64  签名值
+     * @param clientKeyId 客户端密钥标识，为空则回退到服务端全局公钥
+     */
+    boolean verify(String raw, String signBase64, String clientKeyId);
 
     /** 校验时间戳新鲜性与 nonce 防重放 */
     void checkFreshness(Long timestamp, String nonce);

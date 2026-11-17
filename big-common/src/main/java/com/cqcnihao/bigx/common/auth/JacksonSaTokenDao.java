@@ -4,13 +4,14 @@ import cn.dev33.satoken.dao.auto.SaTokenDaoByObjectFollowString;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.context.annotation.Primary;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -82,11 +83,21 @@ public class JacksonSaTokenDao implements SaTokenDaoByObjectFollowString {
 
     @Override
     public List<String> searchData(String prefix, String keyword, int start, int size, boolean sortType) {
-        Set<String> keys = stringRedisTemplate.keys(prefix + "*" + keyword + "*");
-        if (keys == null || keys.isEmpty()) {
+        // 禁止使用 KEYS：生产 Redis 常以 rename-command 禁用该命令，且它是 O(N) 阻塞命令。
+        // 改用 SCAN 游标增量遍历，对线上实例无阻塞风险。
+        List<String> keyList = new ArrayList<>();
+        ScanOptions options = ScanOptions.scanOptions()
+                .match(prefix + "*" + keyword + "*")
+                .count(1000)
+                .build();
+        try (Cursor<String> cursor = stringRedisTemplate.scan(options)) {
+            while (cursor.hasNext()) {
+                keyList.add(cursor.next());
+            }
+        }
+        if (keyList.isEmpty()) {
             return Collections.emptyList();
         }
-        List<String> keyList = new ArrayList<>(keys);
         keyList.sort(sortType ? String::compareTo : Collections.reverseOrder(String::compareTo));
         int fromIndex = Math.min(Math.max(start, 0), keyList.size());
         int toIndex = size < 0 ? keyList.size() : Math.min(fromIndex + size, keyList.size());

@@ -42,7 +42,7 @@ import java.util.Map;
 @SmPlain
 @RestController
 @ConditionalOnExpression("'${big.encrypt.enabled:true}' == 'true'"
-        + " and '${big.encrypt.sm2.expose-key-endpoint:true}' == 'true'")
+        + " and '${big.encrypt.sm2.expose-key-endpoint:false}' == 'true'")
 @RequestMapping("${big.encrypt.sm2.key-endpoint-path:/crypto/sm2/public-key}")
 public final class Sm2KeyController {
 

@@ -15,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -161,5 +162,131 @@ class SmCryptoSmokeTest {
             rejected = true;
         }
         assertTrue(rejected, "重复 nonce 必须被拒绝");
+    }
+
+    @Test
+    void clientKey_rawPointShouldNormalizeToX509AndVerifySignature() {
+        String[] kp = Sm2.generateKeyPairBase64();
+        String rawPoint = uncompressedPointHex(kp[0]);
+
+        String normalized = Sm2.normalizeClientPublicKey(rawPoint);
+        assertEquals(kp[0], normalized, "裸公钥点归一化后应与原始 X.509 完全一致");
+
+        String sign = Sm2.sign("payload".getBytes(StandardCharsets.UTF_8), kp[1]);
+        assertTrue(Sm2.verify("payload".getBytes(StandardCharsets.UTF_8), sign, normalized));
+    }
+
+    @Test
+    void clientKey_registerThenVerifyByClientKeyId() {
+        EncryptProperties props = new EncryptProperties();
+        props.getSm2().setClientKeyEnabled(true);
+        SmCryptoService service = new SmCryptoService(props, new InMemoryReplayGuard(600_000L),
+                new com.cqcnihao.bigx.encrypt.support.InMemoryClientKeyStore());
+
+        String[] kp = Sm2.generateKeyPairBase64();
+        String clientKeyId = service.registerClientKey(uncompressedPointHex(kp[0]));
+        assertTrue(clientKeyId != null && clientKeyId.length() == 32,
+                "clientKeyId 应为服务端随机签发的 128bit 标识");
+
+        String payload = "1700000000000\nnonce\ncipher";
+        String sign = Sm2.sign(payload.getBytes(StandardCharsets.UTF_8), kp[1]);
+        assertTrue(service.verify(payload, sign, clientKeyId), "按登记的客户端公钥验签应通过");
+        assertFalse(service.verify(payload, sign, "ffffffffffffffffffffffffffffffff"),
+                "未登记的公钥必须验签失败，绝不允许降级放行");
+        assertFalse(service.verify(payload, sign), "未配置服务端全局公钥时回退路径应失败");
+    }
+
+    @Test
+    void clientKey_registerShouldRejectInvalidPoint() {
+        EncryptProperties props = new EncryptProperties();
+        props.getSm2().setClientKeyEnabled(true);
+        SmCryptoService service = new SmCryptoService(props, new InMemoryReplayGuard(600_000L),
+                new com.cqcnihao.bigx.encrypt.support.InMemoryClientKeyStore());
+
+        boolean rejected = false;
+        try {
+            service.registerClientKey("04" + "00".repeat(64));
+        } catch (com.cqcnihao.bigx.encrypt.exception.CryptoException e) {
+            rejected = true;
+        }
+        assertTrue(rejected, "不在 SM2 曲线上的公钥必须拒绝登记");
+    }
+
+    @Test
+    void clientKey_ttlShouldBeExposedForClientRenewal() {
+        EncryptProperties props = new EncryptProperties();
+        props.getSm2().setClientKeyEnabled(true);
+        props.getSm2().setClientKeyTtlSeconds(7200);
+        SmCryptoService service = new SmCryptoService(props, new InMemoryReplayGuard(600_000L),
+                new com.cqcnihao.bigx.encrypt.support.InMemoryClientKeyStore());
+
+        // 客户端必须能拿到有效期，否则公钥静默过期后所有加密请求都会被拒
+        assertEquals(7200, service.getClientKeyTtlSeconds());
+    }
+
+    @Test
+    void clientKey_shouldExpireAfterTtl() {
+        EncryptProperties props = new EncryptProperties();
+        props.getSm2().setClientKeyEnabled(true);
+        SmCryptoService service = new SmCryptoService(props, new InMemoryReplayGuard(600_000L),
+                new com.cqcnihao.bigx.encrypt.support.InMemoryClientKeyStore());
+
+        String[] kp = Sm2.generateKeyPairBase64();
+        // TTL 设为 0 秒，写入即过期
+        props.getSm2().setClientKeyTtlSeconds(0);
+        String clientKeyId = service.registerClientKey(uncompressedPointHex(kp[0]));
+        assertNotNull(clientKeyId);
+        assertTrue(service.resolveClientPublicKey(clientKeyId) == null,
+                "过期的客户端公钥必须查不到，避免旧密钥长期有效");
+    }
+
+    @Test
+    void responseSign_whenEnabledShouldSignTimestampAndCipher() {
+        String[] kp = Sm2.generateKeyPairBase64();
+        EncryptProperties props = new EncryptProperties();
+        props.getSm4().setDefaultKeyId("v1");
+        props.getSm4().getKeys().put("v1", Sm4.generateKeyBase64());
+        props.getSm2().setPublicKey(kp[0]);
+        props.getSm2().setPrivateKey(kp[1]);
+        props.setSignResponse(true);
+        SmCryptoService service = new SmCryptoService(props, new InMemoryReplayGuard(600_000L));
+
+        EncryptedPayload payload = service.encrypt("{\"a\":1}", null, null);
+        assertNotNull(payload.getSign(), "开启响应签名后信封必须携带 sign");
+        // 签名原文必须与前端约定一致：timestamp + "\n" + cipher，否则前端 100% 验不过
+        String raw = payload.getTimestamp() + "\n" + payload.getCipher();
+        assertTrue(Sm2.verify(raw.getBytes(StandardCharsets.UTF_8), payload.getSign(), kp[0]),
+                "响应签名应能被对应公钥验签通过");
+        assertFalse(Sm2.verify((payload.getTimestamp() + "\n" + payload.getCipher() + "x")
+                        .getBytes(StandardCharsets.UTF_8), payload.getSign(), kp[0]),
+                "密文被篡改后响应签名必须验签失败");
+    }
+
+    @Test
+    void responseSign_whenDisabledShouldOmitSignField() {
+        EncryptProperties props = new EncryptProperties();
+        props.getSm4().setDefaultKeyId("v1");
+        props.getSm4().getKeys().put("v1", Sm4.generateKeyBase64());
+        SmCryptoService service = new SmCryptoService(props, new InMemoryReplayGuard(600_000L));
+
+        EncryptedPayload payload = service.encrypt("{\"a\":1}", null, null);
+        // 关闭时不能出现空 sign，否则前端会误判「有签名字段」而校验失败
+        assertEquals(null, payload.getSign());
+    }
+
+    /** 从 X.509 Base64 提取 04||X||Y 的裸公钥点 hex，模拟浏览器 sm-crypto 的产出格式 */
+    private static String uncompressedPointHex(String x509Base64) {
+        try {
+            java.security.PublicKey key = java.security.KeyFactory.getInstance("EC",
+                            com.cqcnihao.bigx.encrypt.BcProvider.provider())
+                    .generatePublic(new java.security.spec.X509EncodedKeySpec(
+                            java.util.Base64.getDecoder().decode(x509Base64)));
+            org.bouncycastle.jce.interfaces.ECPublicKey ecKey =
+                    (org.bouncycastle.jce.interfaces.ECPublicKey) key;
+            byte[] encoded = ecKey.getQ().getEncoded(false);
+            return java.util.HexFormat.of().formatHex(encoded);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
     }
 }

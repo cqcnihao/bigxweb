@@ -7,8 +7,11 @@ import org.bouncycastle.crypto.params.ECPrivateKeyParameters;
 import org.bouncycastle.crypto.params.ECPublicKeyParameters;
 import org.bouncycastle.crypto.params.ParametersWithRandom;
 import org.bouncycastle.jcajce.provider.asymmetric.util.ECUtil;
+import org.bouncycastle.jce.ECNamedCurveTable;
 import org.bouncycastle.jce.spec.ECNamedCurveGenParameterSpec;
+import org.bouncycastle.math.ec.ECPoint;
 
+import java.math.BigInteger;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -104,6 +107,59 @@ public final class Sm2 {
         } catch (Exception e) {
             throw new CryptoException(CryptoException.CODE_KEY_MISSING, "SM2 私钥解析失败", e);
         }
+    }
+
+    /**
+     * 客户端公钥归一化为 X.509 Base64
+     * <p>
+     * 浏览器国密库（sm-crypto）生成的是<b>裸公钥点</b>（128 位 hex，X||Y，有时带 04 前缀），
+     * 而 JCA 只认 X.509 SubjectPublicKeyInfo。两者必须在此完成转换，
+     * 否则客户端登记的公钥无法参与验签。
+     *
+     * @param raw 裸公钥点 hex（04||X||Y 或 X||Y），或已经是 X.509 Base64
+     * @return X.509 DER 的 Base64
+     */
+    public static String normalizeClientPublicKey(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new CryptoException(CryptoException.CODE_KEY_MISSING, "客户端公钥不能为空");
+        }
+        String text = raw.trim().replaceAll("\\s", "");
+        if (isX509Base64(text)) {
+            // 非浏览器客户端可能直接登记 X.509，这里解析一次做合法性校验
+            toPublicKey(text);
+            return text;
+        }
+        String hex = text.toLowerCase();
+        if (hex.startsWith("04") && hex.length() == 130) {
+            hex = hex.substring(2);
+        }
+        if (hex.length() != 128 || !hex.matches("[0-9a-f]+")) {
+            throw new CryptoException(CryptoException.CODE_KEY_MISSING,
+                    "客户端公钥格式非法：应为 128 位十六进制裸公钥点");
+        }
+        try {
+            ECPoint point = curve().getCurve().createPoint(
+                    new BigInteger(hex.substring(0, 64), 16),
+                    new BigInteger(hex.substring(64), 16));
+            if (!point.isValid()) {
+                throw new CryptoException(CryptoException.CODE_KEY_MISSING, "客户端公钥不在 SM2 曲线上");
+            }
+            PublicKey publicKey = KeyFactory.getInstance("EC", PROVIDER)
+                    .generatePublic(new org.bouncycastle.jce.spec.ECPublicKeySpec(point, curve()));
+            return Base64.getEncoder().encodeToString(publicKey.getEncoded());
+        } catch (CryptoException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new CryptoException(CryptoException.CODE_KEY_MISSING, "客户端公钥解析失败", e);
+        }
+    }
+
+    private static boolean isX509Base64(String text) {
+        return text.length() > 150 && text.matches("[A-Za-z0-9+/=]+");
+    }
+
+    private static org.bouncycastle.jce.spec.ECParameterSpec curve() {
+        return ECNamedCurveTable.getParameterSpec(CURVE);
     }
 
     // ==================== 加解密（仅用于短数据，如会话密钥） ====================

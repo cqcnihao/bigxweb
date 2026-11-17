@@ -1,4 +1,4 @@
-package com.cqcnihao.bigx.common.mapper;
+package com.cqcnihao.bigx.utils.mapper;
 
 public interface BaseMapper<E, D> {
 

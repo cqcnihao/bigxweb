@@ -4,7 +4,7 @@
     <parent>
         <groupId>com.cqcnihao.bigx</groupId>
         <artifactId>root</artifactId>
-        <version>1.4.7-SNAPSHOT</version>
+        <version>1.4.8-SNAPSHOT</version>
     </parent>
 
     <artifactId>big-common</artifactId>
@@ -15,7 +15,7 @@
         <dependency>
             <groupId>com.cqcnihao.bigx</groupId>
             <artifactId>big-core</artifactId>
-            <version>${big.project.version}</version>
+            <version>${bigx.project.version}</version>
         </dependency>
         
         <!-- Spring Web 依赖（GlobalExceptionHandler 需要） -->

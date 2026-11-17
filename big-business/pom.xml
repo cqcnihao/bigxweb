@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.cqcnihao.bigx</groupId>
         <artifactId>root</artifactId>
-        <version>1.4.7-SNAPSHOT</version>
+        <version>1.4.8-SNAPSHOT</version>
     </parent>
 
     <artifactId>big-business</artifactId>
@@ -20,39 +20,39 @@
         <dependency>
             <groupId>com.cqcnihao.bigx</groupId>
             <artifactId>big-core</artifactId>
-            <version>${big.project.version}</version>
+            <version>${bigx.project.version}</version>
         </dependency>
 
         <dependency>
             <groupId>com.cqcnihao.bigx</groupId>
             <artifactId>big-common</artifactId>
-            <version>${big.project.version}</version>
+            <version>${bigx.project.version}</version>
         </dependency>
 
         <dependency>
             <groupId>com.cqcnihao.bigx</groupId>
             <artifactId>big-web-common</artifactId>
-            <version>${big.project.version}</version>
+            <version>${bigx.project.version}</version>
         </dependency>
 
         <!-- 提供 MybatisPlusConfig（分页/乐观锁/防全表插件）与缓存配置，经 AutoConfiguration.imports 装配 -->
         <dependency>
             <groupId>com.cqcnihao.bigx</groupId>
             <artifactId>big-utils</artifactId>
-            <version>${big.project.version}</version>
+            <version>${bigx.project.version}</version>
         </dependency>
 
         <dependency>
             <groupId>com.cqcnihao.bigx</groupId>
             <artifactId>big-encrypt</artifactId>
-            <version>${big.project.version}</version>
+            <version>${bigx.project.version}</version>
         </dependency>
 
         <!-- 软件许可证校验（big.license.enabled=false 时不装配，默认关闭） -->
         <dependency>
             <groupId>com.cqcnihao.bigx</groupId>
             <artifactId>big-license</artifactId>
-            <version>${big.project.version}</version>
+            <version>${bigx.project.version}</version>
         </dependency>
 
         <dependency>

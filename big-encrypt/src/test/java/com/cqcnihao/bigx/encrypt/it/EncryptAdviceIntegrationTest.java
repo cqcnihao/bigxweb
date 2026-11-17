@@ -89,22 +89,31 @@ class EncryptAdviceIntegrationTest {
         registry.add("big.encrypt.replay-check", () -> "true");
         registry.add("big.encrypt.interceptor-enabled", () -> "true");
         registry.add("big.encrypt.sm2.public-key", () -> SM2_PUBLIC_KEY);
+        // 验签默认开启（严格模式），测试需用配对私钥对信封签名
+        registry.add("big.encrypt.sm2.private-key", () -> SM2_KP[1]);
         registry.add("big.encrypt.sm2.key-id", () -> "sm2-v1");
+        // 公钥端点默认关闭（生产安全默认），测试显式开启
+        registry.add("big.encrypt.sm2.expose-key-endpoint", () -> "true");
     }
 
     @Test
     void encryptedEndpoint_shouldDecryptRequestAndEncryptResponseData() throws Exception {
-        // 1) 客户端：把业务 JSON 用 SM4 加密成信封
+        // 1) 客户端：把业务 JSON 用 SM4 加密成信封，并用 SM2 私钥签名
         String bizJson = "{\"mobile\":\"13800000000\"}";
         EncryptedPayload reqEnv = cryptoService.encrypt(bizJson, null, null);
+
+        long ts = System.currentTimeMillis();
+        String nonce = java.util.UUID.randomUUID().toString();
+        String sign = cryptoService.sign(cryptoService.signPayload(ts, nonce, reqEnv.getCipher()));
 
         String body = objectMapper.writeValueAsString(Map.of(
                 "alg", reqEnv.getAlg(),
                 "keyId", reqEnv.getKeyId(),
                 "cipher", reqEnv.getCipher(),
                 "mac", reqEnv.getMac(),
-                "timestamp", System.currentTimeMillis(),
-                "nonce", java.util.UUID.randomUUID().toString()));
+                "sign", sign,
+                "timestamp", ts,
+                "nonce", nonce));
 
         // 2) 服务端：解密请求、处理业务、加密响应
         MvcResult result = mockMvc.perform(post("/it/echo")
@@ -124,12 +133,74 @@ class EncryptAdviceIntegrationTest {
         assertTrue(data.get("encrypt").asBoolean(), "data 必须标记为密文");
         assertEquals("SM4/CBC/PKCS7Padding", data.get("alg").asText());
         assertNotNull(data.get("mac"));
+        // 未开启响应签名时，信封里不能出现 sign 字段（更不能是 "sign": null）
+        assertFalse(data.has("sign"), "未开启响应签名时不得输出 sign 字段");
 
         // 5) 解密 data，确认 Controller 确实收到了解密后的明文
         String plain = cryptoService.decrypt(data.get("cipher").asText(),
                 data.get("alg").asText(), data.get("keyId").asText(), data.get("mac").asText());
         JsonNode echoed = objectMapper.readTree(plain);
         assertEquals("13800000000", echoed.get("echo").asText());
+    }
+
+    /**
+     * 严格验签语义的核心回归：开启 verify-signature 后，加密信封<b>必须</b>携带签名。
+     * 缺失签名一律拒绝（CODE_SIGN_INVALID），绝不允许“无签名就放行”的宽松模式，
+     * 否则攻击者只需删掉 sign 字段即可绕过签名校验。
+     */
+    @Test
+    void encryptedRequestWithoutSign_shouldBeRejected() throws Exception {
+        EncryptedPayload reqEnv = cryptoService.encrypt("{\"mobile\":\"13800000000\"}", null, null);
+        long ts = System.currentTimeMillis();
+        String nonce = java.util.UUID.randomUUID().toString();
+        // 故意不带 sign
+        String body = objectMapper.writeValueAsString(Map.of(
+                "alg", reqEnv.getAlg(),
+                "keyId", reqEnv.getKeyId(),
+                "cipher", reqEnv.getCipher(),
+                "mac", reqEnv.getMac(),
+                "timestamp", ts,
+                "nonce", nonce));
+
+        MvcResult result = mockMvc.perform(post("/it/echo")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andReturn();
+
+        JsonNode resp = objectMapper.readTree(result.getResponse().getContentAsString());
+        assertEquals("CRY-4003", resp.get("code").asText(), "缺少签名必须以 CODE_SIGN_INVALID 拒绝");
+        assertFalse(resp.get("success").asBoolean());
+    }
+
+    /**
+     * 伪造签名同样必须被拒绝：签名值随机但格式合法时不能放行
+     */
+    @Test
+    void encryptedRequestWithForgedSign_shouldBeRejected() throws Exception {
+        EncryptedPayload reqEnv = cryptoService.encrypt("{\"mobile\":\"13800000000\"}", null, null);
+        long ts = System.currentTimeMillis();
+        String nonce = java.util.UUID.randomUUID().toString();
+        // 用另一个密钥对签名：签名格式合法，但公钥与服务端配置不匹配
+        String[] otherKp = Sm2.generateKeyPairBase64();
+        String payload = cryptoService.signPayload(ts, nonce, reqEnv.getCipher());
+        String forged = Sm2.sign(payload.getBytes(java.nio.charset.StandardCharsets.UTF_8), otherKp[1]);
+        String body = objectMapper.writeValueAsString(Map.of(
+                "alg", reqEnv.getAlg(),
+                "keyId", reqEnv.getKeyId(),
+                "cipher", reqEnv.getCipher(),
+                "mac", reqEnv.getMac(),
+                "sign", forged,
+                "timestamp", ts,
+                "nonce", nonce));
+
+        MvcResult result = mockMvc.perform(post("/it/echo")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andReturn();
+
+        JsonNode resp = objectMapper.readTree(result.getResponse().getContentAsString());
+        assertEquals("CRY-4003", resp.get("code").asText(), "签名不匹配必须以 CODE_SIGN_INVALID 拒绝");
+        assertFalse(resp.get("success").asBoolean());
     }
 
     @Test
@@ -153,13 +224,17 @@ class EncryptAdviceIntegrationTest {
     @Test
     void errorResponse_shouldStayPlainText() throws Exception {
         EncryptedPayload reqEnv = cryptoService.encrypt("{\"mobile\":\"13800000000\"}", null, null);
+        long ts = System.currentTimeMillis();
+        String nonce = java.util.UUID.randomUUID().toString();
+        String sign = cryptoService.sign(cryptoService.signPayload(ts, nonce, reqEnv.getCipher()));
         String body = objectMapper.writeValueAsString(Map.of(
                 "alg", reqEnv.getAlg(),
                 "keyId", reqEnv.getKeyId(),
                 "cipher", reqEnv.getCipher(),
                 "mac", reqEnv.getMac(),
-                "timestamp", System.currentTimeMillis(),
-                "nonce", java.util.UUID.randomUUID().toString()));
+                "sign", sign,
+                "timestamp", ts,
+                "nonce", nonce));
 
         MvcResult result = mockMvc.perform(post("/it/boom")
                         .contentType(MediaType.APPLICATION_JSON)

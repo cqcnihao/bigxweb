@@ -1,6 +1,7 @@
 package com.cqcnihao.bigx.auth.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
+import com.anji.captcha.service.CaptchaService;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.cqcnihao.bigx.auth.dto.LoginDTO;
@@ -49,6 +50,7 @@ class AuthServiceImplTest {
     private SysUserMapper userMapper;
     private StringRedisTemplate redisTemplate;
     private ValueOperations<String, String> valueOps;
+    private CaptchaService captchaService;
     private AuthServiceImpl authService;
 
     @BeforeAll
@@ -63,7 +65,9 @@ class AuthServiceImplTest {
         redisTemplate = mock(StringRedisTemplate.class);
         valueOps = mock(ValueOperations.class);
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
-        authService = new AuthServiceImpl(userMapper, redisTemplate);
+        // AJ-Captcha 行为验证服务（登录传 captchaVerification 时才会用到，本测试走旧字符图验证码）
+        captchaService = mock(CaptchaService.class);
+        authService = new AuthServiceImpl(userMapper, redisTemplate, captchaService);
     }
 
     // ------------------------------------------------------------------

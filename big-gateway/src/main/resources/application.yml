@@ -23,7 +23,9 @@ spring:
         webflux:
           discovery:
             locator:
-              enabled: true
+              # 严禁开启：locator 会让任何注册到 Nacos 的服务自动获得 /服务名/** 路由，
+              # 绕过下方手工配置的严格 Path 路由与签名/登录态校验
+              enabled: false
               lower-case-service-id: true
           routes:
             - id: big-auth
@@ -61,7 +63,8 @@ sa-token:
   token-name: Authorization
   # 与 big-auth 保持一致：30 天有效，避免网关侧提前判定 token 失效
   timeout: 2592000
-  active-timeout: -1
+  # 活跃超时：与 big-auth 保持一致（2 小时无操作即过期）
+  active-timeout: 7200
   is-concurrent: true
   # 与 big-auth 一致：每次登录新建 token，便于单端踢下线
   is-share: false

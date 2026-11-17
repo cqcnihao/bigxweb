@@ -6,6 +6,7 @@ com.cqcnihao.bigx.web.common.config.FileUploadConfig
 com.cqcnihao.bigx.web.common.config.Knife4jConfig
 com.cqcnihao.bigx.web.common.config.GatewayValidationProperties
 com.cqcnihao.bigx.web.common.config.UnifiedErrorControllerConfig
+com.cqcnihao.bigx.web.common.config.OperationLogAutoConfiguration
 com.cqcnihao.bigx.web.common.advice.ResultResponseAdvice
 com.cqcnihao.bigx.web.common.filter.XssFilter
 com.cqcnihao.bigx.web.common.filter.GatewayValidationFilter

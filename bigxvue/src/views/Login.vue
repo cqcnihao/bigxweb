@@ -22,6 +22,10 @@
             </div>
           </div>
         </el-form-item>
+        <!-- 第二步：滑块行为验证（AJ-Captcha），通过后才能登录 -->
+        <el-form-item>
+          <SlideCaptcha ref="slideRef" @verified="onSlideVerified" @failed="onSlideFailed" />
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" style="width: 100%" :loading="loading" @click="handleLogin">登 录</el-button>
         </el-form-item>
@@ -39,6 +43,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock, Key } from '@element-plus/icons-vue'
 import { getCaptcha } from '@/api/auth'
+import SlideCaptcha from '@/components/SlideCaptcha.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
@@ -46,9 +51,20 @@ const route = useRoute()
 const authStore = useAuthStore()
 
 const formRef = ref()
+const slideRef = ref()
 const loading = ref(false)
 const captchaKey = ref('')
 const captchaBase64 = ref('')
+// 滑块行为验证通过后由 SlideCaptcha 组件回调写入的二次校验凭证
+const captchaVerification = ref('')
+
+function onSlideVerified(value) {
+  captchaVerification.value = value
+}
+
+function onSlideFailed() {
+  captchaVerification.value = ''
+}
 
 const form = ref({
   username: 'admin',
@@ -79,18 +95,28 @@ async function handleLogin() {
   if (!formRef.value) return
   await formRef.value.validate(async (valid) => {
     if (!valid) return
+    // 第二步校验：滑块行为验证必须通过，凭证一次性消费
+    if (!captchaVerification.value) {
+      ElMessage.warning('请先完成滑块验证')
+      slideRef.value?.refresh()
+      return
+    }
     loading.value = true
     try {
       await authStore.loginAction({
         username: form.value.username,
         password: form.value.password,
         captchaCode: form.value.captchaCode,
-        captchaKey: form.value.captchaKey
+        captchaKey: form.value.captchaKey,
+        captchaVerification: captchaVerification.value
       })
       ElMessage.success('登录成功')
       const redirect = route.query.redirect || '/dashboard'
       router.push(redirect)
     } catch (e) {
+      // 登录失败：字符图与滑块凭证都已被消费/失效，全部重置
+      captchaVerification.value = ''
+      slideRef.value?.refresh()
       refreshCaptcha()
     } finally {
       loading.value = false

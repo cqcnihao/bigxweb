@@ -28,7 +28,8 @@
 
 [CmdletBinding()]
 param(
-    [string]$GatewayHost = "127.0.0.1:8080",
+    # 网关默认 HTTPS 8443（自签证书），可用 -GatewayHost http://127.0.0.1:8080 覆盖
+    [string]$GatewayHost = "https://127.0.0.1:8443",
     [string]$AuthHost    = "127.0.0.1:8081",
     [string]$BusinessHost = "127.0.0.1:8082",
     [string]$GatewayName = "big-gateway",
@@ -63,14 +64,15 @@ function Add-Result([string]$name, [string]$expected, [string]$actual) {
 }
 
 function Get-HttpCode([string]$url, [string[]]$headers, [string]$method = "GET") {
-    $args = @("-s", "-o", "NUL", "-w", "%{http_code}", "-X", $method)
+    # -k：跳过自签证书校验（网关默认 HTTPS 自签）
+    $args = @("-s", "-k", "-o", "NUL", "-w", "%{http_code}", "-X", $method)
     if ($headers) { foreach ($h in $headers) { $args += @("-H", $h) } }
     $args += $url
     return (& curl.exe @args).Trim()
 }
 
 function Get-Body([string]$url, [string[]]$headers, [string]$method = "GET", [string]$dataFile) {
-    $args = @("-s", "-X", $method)
+    $args = @("-s", "-k", "-X", $method)
     if ($headers) { foreach ($h in $headers) { $args += @("-H", $h) } }
     if ($dataFile) { $args += @("--data-binary", "@$dataFile") }
     $args += $url
@@ -96,7 +98,7 @@ function New-GatewaySignHeaders([string]$path, [string]$method) {
 
 function Invoke-Login {
     Write-Banner "登录（经网关）"
-    $capResp = Get-Body "http://$GatewayHost/auth/captcha"
+    $capResp = Get-Body "$GatewayHost/auth/captcha"
     $capKey = ($capResp | ConvertFrom-Json).data.captchaKey
     if (-not $capKey) { throw "获取验证码失败：$capResp" }
     $capCode = (& $RedisCli get "auth:captcha:$capKey").Trim()
@@ -112,7 +114,7 @@ function Invoke-Login {
     $tmpFile = Join-Path $env:TEMP "bigx-login.json"
     [System.IO.File]::WriteAllText($tmpFile, $loginBody, (New-Object System.Text.UTF8Encoding($false)))
 
-    $loginResp = Get-Body "http://$GatewayHost/auth/login" @("Content-Type: application/json") "POST" $tmpFile
+    $loginResp = Get-Body "$GatewayHost/auth/login" @("Content-Type: application/json") "POST" $tmpFile
     Remove-Item $tmpFile -ErrorAction SilentlyContinue
     $loginJson = $loginResp | ConvertFrom-Json
     if ($loginJson.code -ne "200" -and $loginJson.code -ne 200) { throw "登录失败：$loginResp" }
@@ -137,14 +139,14 @@ try {
     Add-Result "非白名单 /auth/me 无 token" "401" (Get-HttpCode "http://$AuthHost/auth/me" (New-GatewaySignHeaders "/auth/me" "GET"))
 
     Write-Banner "4. 网关链路（经 $GatewayHost）"
-    Add-Result "网关无 token 访问业务接口" "401" (Get-HttpCode "http://$GatewayHost/api/product/page?pageNum=1&pageSize=5")
-    Add-Result "网关验证码接口" "200" (Get-HttpCode "http://$GatewayHost/auth/captcha")
-    Add-Result "网关 CORS 预检" "200" (Get-HttpCode "http://$GatewayHost/api/product/page" @("Origin: $Origin", "Access-Control-Request-Method: GET") "OPTIONS")
+    Add-Result "网关无 token 访问业务接口" "401" (Get-HttpCode "$GatewayHost/api/product/page?pageNum=1&pageSize=5")
+    Add-Result "网关验证码接口" "200" (Get-HttpCode "$GatewayHost/auth/captcha")
+    Add-Result "网关 CORS 预检" "200" (Get-HttpCode "$GatewayHost/api/product/page" @("Origin: $Origin", "Access-Control-Request-Method: GET") "OPTIONS")
 
     if (-not $SkipLogin) {
         Invoke-Login
         Add-Result "直连 合法签名+token" "200" (Get-HttpCode "http://$BusinessHost$BusinessPath" ((New-GatewaySignHeaders $businessUriPath "GET") + @("Authorization: $script:Token")))
-        Add-Result "网关带 token 访问业务接口" "200" (Get-HttpCode "http://$GatewayHost/api/product/page?pageNum=1&pageSize=5" @("Authorization: $script:Token"))
+        Add-Result "网关带 token 访问业务接口" "200" (Get-HttpCode "$GatewayHost/api/product/page?pageNum=1&pageSize=5" @("Authorization: $script:Token"))
     }
     else {
         Write-Host "（已跳过需要登录的用例：直连+token、网关+token、登录）"

@@ -1,7 +1,9 @@
 package com.cqcnihao.bigx.encrypt;
 
 import com.cqcnihao.bigx.encrypt.config.EncryptProperties;
+import com.cqcnihao.bigx.encrypt.support.ClientKeyStore;
 import com.cqcnihao.bigx.encrypt.support.InMemoryReplayGuard;
+import com.cqcnihao.bigx.encrypt.support.RedisClientKeyStore;
 import com.cqcnihao.bigx.encrypt.support.RedisReplayGuard;
 import com.cqcnihao.bigx.encrypt.support.ReplayGuard;
 import lombok.extern.slf4j.Slf4j;
@@ -56,5 +58,19 @@ public class BigEncryptRedisAutoConfiguration {
         }
         log.info("防重放已启用 Redis 实现，nonce TTL={}ms", ttlMillis);
         return new RedisReplayGuard(redisTemplate, Duration.ofMillis(ttlMillis));
+    }
+
+    /**
+     * 客户端 SM2 公钥存储：必须走 Redis。
+     * <p>
+     * 客户端公钥在 A 实例登记、请求被负载均衡打到 B 实例时，
+     * 内存实现会让 B 实例查不到公钥而拒绝<b>合法</b>请求，现象是「随机性验签失败」，
+     * 排查成本极高。因此只要宿主引入 Redis，就强制使用共享存储。
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public ClientKeyStore redisClientKeyStore(StringRedisTemplate redisTemplate) {
+        log.info("客户端 SM2 公钥存储已启用 Redis 实现");
+        return new RedisClientKeyStore(redisTemplate);
     }
 }

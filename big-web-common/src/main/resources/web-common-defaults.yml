@@ -52,6 +52,12 @@ gateway:
       - /swagger-ui/**
       - /doc.html
 
+# 操作日志审计（@OperationLog 注解 + AOP 切面，异步落库）
+# 启用前请先执行 classpath:sql/operation_log.sql 建表脚本
+audit:
+  log:
+    enabled: ${AUDIT_LOG_ENABLED:true}
+
 # 日志配置
 logging:
   level:
@@ -70,6 +76,7 @@ sa-token:
   is-read-header: true
   is-read-cookie: false
   is-read-body: false
-  active-timeout: -1
+  # 活跃超时：指定时间内无操作即视为 token 过期（秒），默认 2 小时
+  active-timeout: 7200
   is-concurrent: true
   is-share: false

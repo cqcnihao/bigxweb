@@ -42,7 +42,8 @@ sa-token:
   token-name: Authorization
   # 与 big-auth 保持一致：30 天有效，避免下游 token 提前失效
   timeout: 2592000
-  active-timeout: -1
+  # 与 big-auth 保持一致：2 小时无操作即视为 token 过期
+  active-timeout: 7200
   is-concurrent: true
   # 与 big-auth 一致：每次登录新建 token，便于单端踢下线
   is-share: false
@@ -79,15 +80,26 @@ big:
     enabled: ${BIG_ENCRYPT_ENABLED:true}
     interceptor-enabled: true
     replay-check: ${BIG_ENCRYPT_REPLAY_CHECK:true}
+    # 响应体附带 SM2 签名：客户端可据此验证响应确实来自本服务端、未被中间人替换。
+    # 签名依赖 sm2.private-key，缺失会让每个加密响应签名失败并返回 500，启动期已做守卫。
+    sign-response: ${SM2_SIGN_RESPONSE:true}
     sm4:
       default-key-id: ${SM4_DEFAULT_KEY_ID:v1}
-      # dev 兜底密钥仅限本地开发；prod profile 检测到默认值/空值将拒绝启动，生产必须注入 SM4_KEY_V1（16 字节 Base64）
+      # 与 big-auth 共用同一把随机密钥（2026-11-17 轮换）；生产必须通过 SM4_KEY_V1 注入并同步网关外所有服务
       keys:
-        v1: ${SM4_KEY_V1:ZGV2LXNtNC1kZXYta2V5IQ==}
-    # SM2 密钥对用于验签/会话密钥保护（@SmEncrypt(sign=true) 时必需）；生产必须通过环境变量注入
+        v1: ${SM4_KEY_V1:LbbeIg78B/N+648M/bRvew==}
+    # SM2 密钥对用于验签/会话密钥保护；生产必须通过环境变量注入
     sm2:
-      public-key: ${SM2_PUBLIC_KEY:}
-      private-key: ${SM2_PRIVATE_KEY:}
+      # 严格语义：加密信封必须携带合法 SM2 签名，缺失或校验失败一律拒绝（CODE_SIGN_INVALID）。
+      # 浏览器无法持有服务端私钥，故配套启用客户端密钥体系：客户端本地生成密钥对，
+      # 公钥登记到 /crypto/sm2/client-key，请求带 clientKeyId + 本地私钥签名，服务端据此验签。
+      verify-signature: ${SM2_VERIFY_SIGN:true}
+      client-key-enabled: ${SM2_CLIENT_KEY_ENABLED:true}
+      client-key-ttl-seconds: ${SM2_CLIENT_KEY_TTL:86400}
+      # dev 兜底密钥对仅限本地开发（与 big-auth 共用同一对，前端只需一份公钥验签）；
+      # prod profile 检测到空值或该 dev 默认私钥将拒绝启动，生产必须注入 SM2_PUBLIC_KEY / SM2_PRIVATE_KEY
+      public-key: '${SM2_PUBLIC_KEY:MFkwEwYHKoZIzj0CAQYIKoEcz1UBgi0DQgAEGKIq1EqAQ5hE7PafJzqO92LiDzEYD9lAQ4JA0wgZ+jvsPa+jUNug7JP9InPkN7aOSDKy4F1wxglmm3k/ehoRyw==}'
+      private-key: '${SM2_PRIVATE_KEY:MIGTAgEAMBMGByqGSM49AgEGCCqBHM9VAYItBHkwdwIBAQQglEQ0TosYMTeLirfDIfeTwgehdBrAchz/jebTeFYpI9KgCgYIKoEcz1UBgi2hRANCAAQYoirUSoBDmETs9p8nOo73YuIPMRgP2UBDgkDTCBn6O+w9r6NQ26Dsk/0ic+Q3to5IMrLgXXDGCWabeT96GhHL}'
     # 为空时回退为 SM4 密钥派生
     sm3:
       mac-key: ${SM3_MAC_KEY:}

@@ -1,6 +1,0 @@
-# ============================================================
-# big-utils 通用库配置
-# 注意：数据源、调度器、easy-trans等模块专属配置请勿放在此处
-# MyBatis-Plus 通用默认配置已迁移至 mybatis-plus-defaults.yml
-# 各业务模块通过 spring.config.import=classpath:mybatis-plus-defaults.yml 导入
-# ============================================================

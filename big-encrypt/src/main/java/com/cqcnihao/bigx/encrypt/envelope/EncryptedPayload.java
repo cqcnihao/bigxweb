@@ -1,5 +1,6 @@
 package com.cqcnihao.bigx.encrypt.envelope;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -50,7 +51,8 @@ public class EncryptedPayload implements Serializable {
     /** Base64(HMAC-SM3)，Encrypt-then-MAC */
     private String mac;
 
-    /** Base64(SM2 签名)，可选 */
+    /** Base64(SM2 签名)，可选；未签名时直接省略该字段，避免前端误判“存在签名字段” */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private String sign;
 
     /** 服务端时间戳，供客户端做新鲜性校验 */

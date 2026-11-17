@@ -1,6 +1,9 @@
 package com.cqcnihao.bigx.auth.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
+import com.anji.captcha.model.common.ResponseModel;
+import com.anji.captcha.model.vo.CaptchaVO;
+import com.anji.captcha.service.CaptchaService;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cqcnihao.bigx.auth.dto.LoginDTO;
 import com.cqcnihao.bigx.auth.dto.LoginVO;
@@ -60,6 +63,7 @@ public class AuthServiceImpl implements AuthService {
 
     private final SysUserMapper userMapper;
     private final StringRedisTemplate redisTemplate;
+    private final CaptchaService captchaService;
 
     @Override
     public Map<String, String> captcha() {
@@ -85,7 +89,7 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException("429", "登录尝试过于频繁，请稍后再试");
         }
 
-        verifyCaptcha(dto.getCaptchaKey(), dto.getCaptchaCode());
+        verifyCaptcha(dto);
 
         String username = dto.getUsername();
         if (Boolean.TRUE.equals(redisTemplate.hasKey(LOGIN_LOCK_PREFIX + username))) {
@@ -152,8 +156,37 @@ public class AuthServiceImpl implements AuthService {
         return vo;
     }
 
-    /** 校验验证码；无论对错用完即作废，防止同一验证码被暴力复用 */
-    private void verifyCaptcha(String captchaKey, String captchaCode) {
+    /**
+     * 校验验证码（两步）：① 字符图验证码（captchaKey/captchaCode）在前；
+     * ② 携带 captchaVerification 凭证时，行为验证（AJ-Captcha 滑动拼图）作为第二道校验。
+     * 两者任一失败都直接拒绝登录；未携带凭证时仅走字符图（兼容旧客户端/单测）。
+     */
+    private void verifyCaptcha(LoginDTO dto) {
+        verifyImageCaptcha(dto.getCaptchaKey(), dto.getCaptchaCode());
+        if (StringUtils.hasText(dto.getCaptchaVerification())) {
+            verifyAjCaptcha(dto.getCaptchaVerification());
+        }
+    }
+
+    /**
+     * AJ-Captcha 二次校验：check 阶段换取的凭证在服务端一次性消费（Redis 键删除），
+     * 重复提交 / 超过 180 秒都会被拒绝，防止凭证重放
+     */
+    private void verifyAjCaptcha(String captchaVerification) {
+        CaptchaVO captchaVO = new CaptchaVO();
+        captchaVO.setCaptchaType("blockPuzzle");
+        captchaVO.setCaptchaVerification(captchaVerification);
+        ResponseModel resp = captchaService.verification(captchaVO);
+        if (resp == null || !resp.isSuccess()) {
+            log.warn("AJ-Captcha 二次校验失败: code={}, msg={}",
+                    resp == null ? "null" : resp.getRepCode(),
+                    resp == null ? "" : resp.getRepMsg());
+            throw new BusinessException("400", "行为验证失败或已过期，请重新完成滑块验证");
+        }
+    }
+
+    /** 旧字符图验证码校验；无论对错用完即作废，防止同一验证码被暴力复用 */
+    private void verifyImageCaptcha(String captchaKey, String captchaCode) {
         if (!StringUtils.hasText(captchaKey) || !StringUtils.hasText(captchaCode)) {
             throw new BusinessException("400", "验证码不能为空");
         }

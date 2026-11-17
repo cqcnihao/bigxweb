@@ -1,6 +1,5 @@
 package com.cqcnihao.bigx.utils.mybatis;
 
-import com.baomidou.mybatisplus.extension.plugins.inner.DynamicTableNameInnerInterceptor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -16,7 +15,7 @@ public class MybatisPlusConfig {
     /**
      * 配置 MyBatis-Plus 的核心拦截器链
      * <p>
-     * 注意拦截器的添加顺序会影响执行顺序，动态表名拦截器必须第一个添加
+     * 注意拦截器的添加顺序会影响执行顺序
      *
      * @return 配置好的 MyBatis-Plus 拦截器实例
      */
@@ -24,9 +23,6 @@ public class MybatisPlusConfig {
     public MybatisPlusInterceptor mybatisPlusInterceptor() {
         // 创建拦截器实例
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
-
-        // 添加动态表名拦截器（必须第一个添加，用于处理动态表名逻辑）
-        interceptor.addInnerInterceptor(dynamicTableNameInterceptor());
 
         // 添加乐观锁拦截器（实现版本号控制的乐观锁机制）
         interceptor.addInnerInterceptor(optimisticLockerInnerInterceptor());
@@ -89,35 +85,5 @@ public class MybatisPlusConfig {
         // 创建并返回 BlockAttackInnerInterceptor 实例
         // 该拦截器无需额外配置，默认会拦截无 WHERE 条件的更新/删除操作
         return new BlockAttackInnerInterceptor();
-    }
-
-    /**
-     * 动态表名处理
-     * <p>
-     * 创建并配置动态表名拦截器，用于根据业务需求动态修改SQL中的表名。
-     * 该方法会检查表名是否在可动态处理的表名单中，如果是则添加后缀。
-     *
-     * @return 配置好的动态表名拦截器实例
-     */
-    private DynamicTableNameInnerInterceptor dynamicTableNameInterceptor() {
-        // 创建动态表名拦截器实例
-        DynamicTableNameInnerInterceptor interceptor = new DynamicTableNameInnerInterceptor();
-
-        // 设置表名处理器，用于动态修改SQL中的表名
-        interceptor.setTableNameHandler((sql, tableName) -> {
-            // 检查表名是否在可动态处理的表名单中
-            // 如果表名单为空或当前表名不在名单中，则返回原表名
-            if (YueYouBangConfig.getDynamicTableList() == null || !YueYouBangConfig.getDynamicTableList().contains(tableName.toLowerCase())) {
-                return tableName;
-            }
-
-            // 从上下文中获取表名后缀
-            String suffix = DynamicTableNameContext.getTableNameSuffix();
-
-            // 如果存在后缀，则在原表名后追加后缀，否则返回原表名
-            return suffix != null ? tableName + "_" + suffix : tableName;
-        });
-
-        return interceptor;
     }
 }

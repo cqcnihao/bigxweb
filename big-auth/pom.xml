@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.cqcnihao.bigx</groupId>
         <artifactId>root</artifactId>
-        <version>1.4.7-SNAPSHOT</version>
+        <version>1.4.8-SNAPSHOT</version>
     </parent>
 
     <artifactId>big-auth</artifactId>
@@ -20,32 +20,32 @@
         <dependency>
             <groupId>com.cqcnihao.bigx</groupId>
             <artifactId>big-core</artifactId>
-            <version>${big.project.version}</version>
+            <version>${bigx.project.version}</version>
         </dependency>
 
         <dependency>
             <groupId>com.cqcnihao.bigx</groupId>
             <artifactId>big-common</artifactId>
-            <version>${big.project.version}</version>
+            <version>${bigx.project.version}</version>
         </dependency>
 
         <dependency>
             <groupId>com.cqcnihao.bigx</groupId>
             <artifactId>big-web-common</artifactId>
-            <version>${big.project.version}</version>
+            <version>${bigx.project.version}</version>
         </dependency>
 
         <dependency>
             <groupId>com.cqcnihao.bigx</groupId>
             <artifactId>big-encrypt</artifactId>
-            <version>${big.project.version}</version>
+            <version>${bigx.project.version}</version>
         </dependency>
 
         <!-- 软件许可证校验（big.license.enabled=false 时不装配，默认关闭） -->
         <dependency>
             <groupId>com.cqcnihao.bigx</groupId>
             <artifactId>big-license</artifactId>
-            <version>${big.project.version}</version>
+            <version>${bigx.project.version}</version>
         </dependency>
 
         <dependency>
@@ -112,6 +112,26 @@
         <dependency>
             <groupId>com.github.whvcse</groupId>
             <artifactId>easy-captcha</artifactId>
+        </dependency>
+
+        <!-- AJ-Captcha 行为验证码（滑动拼图）：starter 的 Boot2 自动装配在 Boot 4 下不生效，
+             仅取其核心类（com.anji-plus:captcha，含 defaultImages/jigsaw 底图）；
+             装配 / 控制器 / Redis 缓存 SPI 由本模块自写（见 AjCaptchaConfig） -->
+        <dependency>
+            <groupId>com.anji-plus</groupId>
+            <artifactId>captcha-spring-boot-starter</artifactId>
+            <version>1.4.0</version>
+            <exclusions>
+                <!-- 排除 Boot2 体系传递依赖，避免与 Boot 4 冲突 -->
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-aop</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-autoconfigure</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <!-- BCrypt 口令散列（仅 crypto 包，不引入 Security 过滤器链） -->

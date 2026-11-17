@@ -27,6 +27,9 @@ public final class EncryptContext {
     /** 请求头：SM4 密钥版本 */
     public static final String HEADER_KEY_ID = "X-Sm-Key-Id";
 
+    /** 请求头：客户端 SM2 密钥标识（服务端登记时签发） */
+    public static final String HEADER_CLIENT_KEY_ID = "X-Sm-Client-Key-Id";
+
     /** 属性：本次请求已命中白名单 / 明文放行 */
     public static final String ATTR_SKIPPED = EncryptContext.class.getName() + ".SKIPPED";
 

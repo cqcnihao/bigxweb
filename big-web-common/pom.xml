@@ -5,7 +5,7 @@
     <parent>
         <groupId>com.cqcnihao.bigx</groupId>
         <artifactId>root</artifactId>
-        <version>1.4.7-SNAPSHOT</version>
+        <version>1.4.8-SNAPSHOT</version>
     </parent>
 
     <artifactId>big-web-common</artifactId>
@@ -19,21 +19,21 @@
         <dependency>
             <groupId>com.cqcnihao.bigx</groupId>
             <artifactId>big-common</artifactId>
-            <version>${big.project.version}</version>
+            <version>${bigx.project.version}</version>
         </dependency>
         
         <!-- 依赖 big-utils 工具模块 -->
         <dependency>
             <groupId>com.cqcnihao.bigx</groupId>
             <artifactId>big-utils</artifactId>
-            <version>${big.project.version}</version>
+            <version>${bigx.project.version}</version>
         </dependency>
 
         <!-- 依赖 big-Encrypt 国密加解密模块（SM2/SM3/SM4） -->
         <dependency>
             <groupId>com.cqcnihao.bigx</groupId>
             <artifactId>big-encrypt</artifactId>
-            <version>${big.project.version}</version>
+            <version>${bigx.project.version}</version>
         </dependency>
         
         <!-- Spring Web 依赖 -->

@@ -24,4 +24,10 @@ public class LoginDTO implements Serializable {
     private String captchaCode;
 
     private String captchaKey;
+
+    /**
+     * AJ-Captcha 滑动拼图二次校验凭证（/auth/captcha/check 成功后返回）。
+     * 优先使用：携带本字段时走行为验证码二次校验；为空时回退旧字符图验证码（captchaKey/captchaCode）。
+     */
+    private String captchaVerification;
 }
