@@ -26,3 +26,23 @@ license/
 *.lic
 *.store
 /下游验证测试报告.md
+
+# 前端构建产物与依赖（禁止入库）
+node_modules/
+dist/
+*.tsbuildinfo
+
+# 本地调试/临时脚本与产物（不入库）
+.file_inventory.txt
+_inventory.txt
+test_envelope.json
+login_body.json
+GenLic.java
+test-login.js
+test_crypto.mjs
+test_encrypt.cjs
+test_encrypt.mjs
+test_sm4.mjs
+vite_test.js
+seed.cjs
+gen_env.mjs
